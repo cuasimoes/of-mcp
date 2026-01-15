@@ -16,8 +16,11 @@ export interface OmnifocusTask {
     deferDate: string | null;
     plannedDate: string | null;
     effectivePlannedDate: string | null;
+    createdDate: string | null;
+
+    // Time estimation
     estimatedMinutes: number | null;
-    
+
     // Organization
     tags: string[]; // Tag IDs
     tagNames: string[]; // Human-readable tag names
