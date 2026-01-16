@@ -287,6 +287,11 @@ function formatTask(task: any): string {
     output += ` [ID: ${task.id}]`;
   }
 
+  // Created date
+  if (task.createdDate) {
+    output += ` (created: ${new Date(task.createdDate).toLocaleDateString()})`;
+  }
+
   // Date info
   const dateInfo: string[] = [];
   if (task.dueDate) {

@@ -139,6 +139,11 @@ function formatTask(task: any): string {
     output += ` (${task.taskStatus})`;
   }
 
+  // Created date
+  if (task.createdDate) {
+    output += ` (created: ${new Date(task.createdDate).toLocaleDateString()})`;
+  }
+
   output += '\n';
 
   // Date info
