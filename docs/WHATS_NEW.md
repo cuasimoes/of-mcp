@@ -1,6 +1,42 @@
-# OmniFocus MCP Server - What's New (v1.29.3)
+# OmniFocus MCP Server - What's New (v1.29.5)
 
 > Summary of changes from Sprints 1-10 for AI assistants using this MCP server.
+
+## v1.29.5 Error Handling and Logging Improvements
+
+**Fixed silent failure in script path resolution:**
+- Previously, if no script path was found, the code silently fell back to an unchecked path
+- Now throws an informative error listing all attempted paths with troubleshooting guidance
+- Error message includes actionable steps: run build commands, check script files exist
+
+**Added debug logging for script path resolution:**
+- Each path resolution now logs the selected path and build type (esbuild, tsc, dev, absolute)
+- Makes debugging build/path issues much easier
+
+**Restored `dev` script to watch mode:**
+- `npm run dev` now runs `tsc -w` again (continuous compilation)
+- Previous change to `ts-node` was a behavioral regression
+
+---
+
+## v1.29.4 Build System Improvements
+
+**Added `npm run build:fast` alternative build option:**
+- Uses esbuild instead of tsc for ~14ms builds (vs minutes with tsc)
+- Useful when tsc hangs or runs out of memory on some systems
+- Produces identical working output to `npm run build`
+
+**Fixed script path resolution for bundled builds:**
+- OmniJS script files now resolve correctly when using esbuild bundled output
+- Added `bundledPath` check in `scriptExecution.ts` for `dist/server.js` location
+- Supports both tsc (separate files) and esbuild (single bundle) build outputs
+
+**Why this matters:**
+- Some systems experience tsc hangs due to complex type inference in `@modelcontextprotocol/sdk` and `zod`
+- The `build:fast` script provides a reliable alternative that skips type checking
+- For type validation, run `npx tsc --noEmit` separately or rely on IDE integration
+
+---
 
 ## v1.29.3 Complete Logging Standardization (Issue #84)
 

@@ -89,18 +89,40 @@ export async function executeOmniFocusScript(
       const __filename = fileURLToPath(import.meta.url);
       const __dirname = dirname(__filename);
       
+      // Path for esbuild bundle (everything in dist/server.js)
+      const bundledPath = join(__dirname, 'utils', 'omnifocusScripts', scriptName);
+      // Path for tsc build (files in dist/utils/)
       const distPath = join(__dirname, '..', 'utils', 'omnifocusScripts', scriptName);
+      // Path for dev mode (running from src)
       const srcPath = join(__dirname, '..', '..', 'src', 'utils', 'omnifocusScripts', scriptName);
-      
-      if (existsSync(distPath)) {
+
+      if (existsSync(bundledPath)) {
+        actualPath = bundledPath;
+        log.debug('Script path resolved', { scriptName, actualPath, buildType: 'esbuild' });
+      } else if (existsSync(distPath)) {
         actualPath = distPath;
+        log.debug('Script path resolved', { scriptName, actualPath, buildType: 'tsc' });
       } else if (existsSync(srcPath)) {
         actualPath = srcPath;
+        log.debug('Script path resolved', { scriptName, actualPath, buildType: 'dev' });
       } else {
-        actualPath = join(__dirname, '..', 'omnifocusScripts', scriptName);
+        const attemptedPaths = [bundledPath, distPath, srcPath];
+        log.error('Script file not found in any expected location', {
+          scriptName,
+          attemptedPaths,
+          __dirname
+        });
+        throw new Error(
+          `Script '${scriptName}' not found. Attempted paths:\n` +
+          attemptedPaths.map(p => `  - ${p}`).join('\n') +
+          `\n\nThis usually means:\n` +
+          `  - The build did not complete successfully (run 'npm run build' or 'npm run build:fast')\n` +
+          `  - The script file is missing from src/utils/omnifocusScripts/`
+        );
       }
     } else {
       actualPath = scriptPath;
+      log.debug('Script path resolved', { scriptName: scriptPath, actualPath, buildType: 'absolute' });
     }
     
     // Read the script file
