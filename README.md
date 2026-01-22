@@ -340,7 +340,8 @@ list_custom_perspectives {"format": "detailed"}
 get_custom_perspective_tasks {
   "perspectiveName": "Today's Work",  # Your custom perspective name
   "showHierarchy": true,              # Enable tree display
-  "hideCompleted": true
+  "hideCompleted": true,
+  "ignoreFocus": true                 # Clear Focus mode to see all tasks (default: true)
 }
 
 # Get tasks from custom perspective by ID
