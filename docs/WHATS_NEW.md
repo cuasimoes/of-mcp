@@ -1,6 +1,17 @@
-# OmniFocus MCP Server - What's New (v1.30.0)
+# OmniFocus MCP Server - What's New (v1.30.1)
 
 > Summary of changes from Sprints 1-10 for AI assistants using this MCP server.
+
+## v1.30.1 Type-Safe Error Handling (Issue #86)
+
+**Internal improvement: Standardized error handling with type guards**
+
+- Replaced `catch (error: any)` patterns with type-safe `catch (error)` using proper type guards
+- Added `isExecException` type guard for Node.js `ExecException` properties (`killed`, `signal`, `stderr`)
+- Updated `categorizeError` to accept `unknown` instead of `any`
+- No functional changes - this is a TypeScript strictness improvement
+
+---
 
 ## v1.30.0 Focus Mode Handling for Custom Perspectives (Issue #68)
 

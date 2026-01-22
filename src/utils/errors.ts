@@ -143,28 +143,30 @@ export function createValidationError(message: string, details?: string): Struct
  * Categorize raw errors from script execution into structured errors
  * Used by scriptExecution.ts to provide consistent error handling
  */
-export function categorizeError(error: any): StructuredError {
-  const message = error.message?.toLowerCase() || '';
-  const stderr = error.stderr?.toLowerCase() || '';
+export function categorizeError(error: unknown): StructuredError {
+  // Safely extract message using type guards
+  const errorMessage = error instanceof Error ? error.message : String(error);
+  const message = errorMessage.toLowerCase();
+  const stderr = (isExecException(error) ? error.stderr : '')?.toLowerCase() || '';
   const combined = message + ' ' + stderr;
 
   // Timeout errors (from our EXEC_OPTIONS timeout)
-  if (error.killed && error.signal === 'SIGTERM') {
-    return createTimeoutError(error.message);
+  if (isExecException(error) && error.killed && error.signal === 'SIGTERM') {
+    return createTimeoutError(errorMessage);
   }
 
   // Permission errors
   if (combined.includes('not authorized') ||
       combined.includes('-1743') ||
       combined.includes('permission')) {
-    return createPermissionError(error.message);
+    return createPermissionError(errorMessage);
   }
 
   // App not running
   if (combined.includes('not running') ||
       combined.includes('-600') ||
       combined.includes("application isn't running")) {
-    return createAppUnavailableError(error.message);
+    return createAppUnavailableError(errorMessage);
   }
 
   // Script syntax errors
@@ -175,33 +177,46 @@ export function categorizeError(error: any): StructuredError {
         code: ErrorCodes.SCRIPT_SYNTAX_ERROR,
         type: 'script_error',
         message: 'Script syntax error',
-        details: error.message,
+        details: errorMessage,
         retryable: false
       }
     };
   }
 
   // Unknown errors
+  const errorStack = error instanceof Error ? error.stack : undefined;
   return {
     success: false,
     error: {
       code: ErrorCodes.UNKNOWN_ERROR,
       type: 'unknown',
-      message: error.message || 'Unknown error occurred',
-      details: error.stack,
+      message: errorMessage || 'Unknown error occurred',
+      details: errorStack,
       retryable: false
     }
   };
 }
 
 /**
+ * Type guard for Node.js ExecException with process termination properties.
+ * Used to safely access error.killed, error.signal, and error.stderr.
+ */
+export function isExecException(error: unknown): error is NodeJS.ErrnoException & {
+  killed?: boolean;
+  signal?: NodeJS.Signals;
+  stderr?: string;
+} {
+  return typeof error === 'object' && error !== null && 'killed' in error;
+}
+
+/**
  * Check if an error is a StructuredError
  */
-export function isStructuredError(error: any): error is StructuredError {
-  return error &&
-         typeof error === 'object' &&
-         error.success === false &&
-         error.error &&
-         typeof error.error.code === 'string' &&
-         typeof error.error.type === 'string';
+export function isStructuredError(error: unknown): error is StructuredError {
+  if (typeof error !== 'object' || error === null) return false;
+  const obj = error as Record<string, unknown>;
+  if (obj.success !== false) return false;
+  if (typeof obj.error !== 'object' || obj.error === null) return false;
+  const errObj = obj.error as Record<string, unknown>;
+  return typeof errObj.code === 'string' && typeof errObj.type === 'string';
 }
