@@ -1,6 +1,38 @@
-# OmniFocus MCP Server - What's New (v1.29.7)
+# OmniFocus MCP Server - What's New (v1.30.0)
 
 > Summary of changes from Sprints 1-10 for AI assistants using this MCP server.
+
+## v1.30.0 Focus Mode Handling for Custom Perspectives (Issue #68)
+
+**New Feature: Focus Mode Awareness**
+
+When OmniFocus Focus mode is active, perspective queries normally return only focused items. AI assistants had no visibility into this, thinking they were seeing the full picture when actually getting filtered data.
+
+**Solution:**
+- Added `ignoreFocus` parameter to `get_custom_perspective_tasks` (default: `true`)
+- When `true` (default): Clears Focus mode temporarily to return all tasks
+- When `false`: Respects Focus mode, returns only focused tasks
+- Response includes Focus metadata showing when Focus was active
+
+**Output example when Focus was active:**
+```
+**Perspective Tasks: Dashboard** (47 tasks)
+> Focus mode was active on "Work Projects" - temporarily cleared for complete results
+
+1. **Task Name** [ID: abc123]
+   ...
+```
+
+**Usage:**
+```json
+// Get all tasks (ignores Focus mode - default)
+{"perspectiveName": "Dashboard"}
+
+// Respect Focus mode
+{"perspectiveName": "Dashboard", "ignoreFocus": false}
+```
+
+---
 
 ## v1.29.7 Fix batch_edit_items newFolderId Support (Issue #90)
 

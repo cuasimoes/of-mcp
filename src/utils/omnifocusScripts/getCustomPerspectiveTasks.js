@@ -7,6 +7,25 @@
     const perspectiveName = injectedArgs && injectedArgs.perspectiveName ? injectedArgs.perspectiveName : null;
     const perspectiveId = injectedArgs && injectedArgs.perspectiveId ? injectedArgs.perspectiveId : null;
 
+    // Get Focus state BEFORE any operations
+    const originalFocus = document.focus;
+    const focusWasActive = originalFocus !== null;
+    const focusTarget = focusWasActive ? {
+      name: originalFocus.name,
+      type: originalFocus instanceof Project ? "project" :
+            originalFocus instanceof Folder ? "folder" :
+            originalFocus instanceof Tag ? "tag" : "unknown"
+    } : null;
+
+    // Clear Focus if ignoreFocus is true (default)
+    const ignoreFocus = injectedArgs && injectedArgs.ignoreFocus !== undefined
+      ? injectedArgs.ignoreFocus
+      : true;
+
+    if (ignoreFocus && focusWasActive) {
+      document.focus = null;
+    }
+
     if (!perspectiveName && !perspectiveId) {
       throw new Error("Must provide either perspectiveName or perspectiveId");
     }
@@ -97,7 +116,12 @@
       perspectiveName: perspective.name,
       perspectiveId: perspective.identifier,
       count: taskCount,
-      taskMap: taskMap
+      taskMap: taskMap,
+      focus: {
+        wasActive: focusWasActive,
+        cleared: ignoreFocus && focusWasActive,
+        target: focusTarget
+      }
     };
 
     return JSON.stringify(result);

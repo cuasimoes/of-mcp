@@ -10,10 +10,17 @@ export interface GetCustomPerspectiveTasksOptions {
   hideCompleted?: boolean;
   limit?: number;
   showHierarchy?: boolean;
+  ignoreFocus?: boolean;
+}
+
+interface FocusInfo {
+  wasActive: boolean;
+  cleared: boolean;
+  target: { name: string; type: string } | null;
 }
 
 export async function getCustomPerspectiveTasks(options: GetCustomPerspectiveTasksOptions): Promise<string> {
-  const { perspectiveName, perspectiveId, hideCompleted = true, limit = 1000, showHierarchy = false } = options;
+  const { perspectiveName, perspectiveId, hideCompleted = true, limit = 1000, showHierarchy = false, ignoreFocus = true } = options;
 
   if (!perspectiveName && !perspectiveId) {
     return "❌ **Error**: Must provide either perspectiveName or perspectiveId";
@@ -23,7 +30,8 @@ export async function getCustomPerspectiveTasks(options: GetCustomPerspectiveTas
     // Execute the get custom perspective tasks script
     const result = await executeOmniFocusScript('@getCustomPerspectiveTasks.js', {
       perspectiveName: perspectiveName,
-      perspectiveId: perspectiveId
+      perspectiveId: perspectiveId,
+      ignoreFocus: ignoreFocus
     });
 
     // Handle various return types
@@ -49,6 +57,9 @@ export async function getCustomPerspectiveTasks(options: GetCustomPerspectiveTas
     // Get the actual perspective name from the result (OmniJS always returns it)
     const actualPerspectiveName = data.perspectiveName || perspectiveName || 'Unknown Perspective';
 
+    // Extract focus info from response
+    const focusInfo: FocusInfo | undefined = data.focus;
+
     // Process taskMap data (hierarchical structure)
     const taskMap = data.taskMap || {};
     const allTasks = Object.values(taskMap);
@@ -60,14 +71,17 @@ export async function getCustomPerspectiveTasks(options: GetCustomPerspectiveTas
     }
 
     if (filteredTasks.length === 0) {
-      return `**Perspective Tasks: ${actualPerspectiveName}**\n\nNo ${hideCompleted ? 'incomplete ' : ''}tasks.`;
+      let emptyMsg = `**Perspective Tasks: ${actualPerspectiveName}**\n`;
+      emptyMsg += formatFocusWarning(focusInfo);
+      emptyMsg += `\nNo ${hideCompleted ? 'incomplete ' : ''}tasks.`;
+      return emptyMsg;
     }
 
     // Choose output format based on hierarchy setting
     if (showHierarchy) {
-      return formatHierarchicalTasks(actualPerspectiveName, taskMap, hideCompleted);
+      return formatHierarchicalTasks(actualPerspectiveName, taskMap, hideCompleted, focusInfo);
     } else {
-      return formatFlatTasks(actualPerspectiveName, filteredTasks, limit, data.count);
+      return formatFlatTasks(actualPerspectiveName, filteredTasks, limit, data.count, focusInfo);
     }
 
   } catch (error) {
@@ -76,9 +90,23 @@ export async function getCustomPerspectiveTasks(options: GetCustomPerspectiveTas
   }
 }
 
+// Format focus warning message
+function formatFocusWarning(focusInfo?: FocusInfo): string {
+  if (!focusInfo?.wasActive) {
+    return '';
+  }
+  if (focusInfo.cleared) {
+    return `> Focus mode was active on "${focusInfo.target?.name}" - temporarily cleared for complete results\n`;
+  } else {
+    return `> **Focus mode active** on "${focusInfo.target?.name}" - showing filtered results only\n`;
+  }
+}
+
 // Format hierarchical task display
-function formatHierarchicalTasks(perspectiveName: string, taskMap: any, hideCompleted: boolean): string {
-  const header = `**Perspective Tasks: ${perspectiveName}** (Hierarchical View)\n\n`;
+function formatHierarchicalTasks(perspectiveName: string, taskMap: any, hideCompleted: boolean, focusInfo?: FocusInfo): string {
+  let header = `**Perspective Tasks: ${perspectiveName}** (Hierarchical View)\n`;
+  header += formatFocusWarning(focusInfo);
+  header += '\n';
 
   // Find all root tasks (tasks with parent === null)
   const rootTasks = Object.values(taskMap).filter((task: any) => task.parent === null);
@@ -191,7 +219,7 @@ function formatTaskDetails(task: any): string[] {
 }
 
 // Format flat task display
-function formatFlatTasks(perspectiveName: string, tasks: any[], limit: number, totalCount: number): string {
+function formatFlatTasks(perspectiveName: string, tasks: any[], limit: number, totalCount: number, focusInfo?: FocusInfo): string {
   // Limit task count
   let displayTasks = tasks;
   if (limit && limit > 0) {
@@ -242,7 +270,9 @@ function formatFlatTasks(perspectiveName: string, tasks: any[], limit: number, t
     return taskText;
   }).join('\n\n');
 
-  const header = `**Perspective Tasks: ${perspectiveName}** (${displayTasks.length} task${displayTasks.length === 1 ? '' : 's'})\n\n`;
+  let header = `**Perspective Tasks: ${perspectiveName}** (${displayTasks.length} task${displayTasks.length === 1 ? '' : 's'})\n`;
+  header += formatFocusWarning(focusInfo);
+  header += '\n';
   const footer = totalCount > displayTasks.length ? `\n\nNote: Found ${totalCount} tasks, showing ${displayTasks.length}` : '';
 
   return header + taskList + footer;

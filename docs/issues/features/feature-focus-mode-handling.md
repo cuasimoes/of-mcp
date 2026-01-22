@@ -1,8 +1,9 @@
 # Feature: Focus Mode Handling for Custom Perspective Queries
 
-**Status:** Planned for future sprint
+**Status:** ✅ Implemented in v1.30.0
 **Priority:** Medium
 **Created:** 2025-01-11
+**Completed:** 2026-01-22
 
 ## Problem
 
