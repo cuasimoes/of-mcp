@@ -8,7 +8,8 @@ export const schema = z.object({
   perspectiveId: z.string().optional().describe("ID of the custom perspective (alternative to perspectiveName). Get IDs from list_custom_perspectives."),
   hideCompleted: z.boolean().optional().describe("Whether to hide completed tasks. Set to false to show all tasks including completed ones (default: true)"),
   limit: z.number().optional().describe("Maximum number of tasks to return in flat view mode (default: 1000, ignored in hierarchy mode)"),
-  showHierarchy: z.boolean().optional().describe("Display tasks in hierarchical tree structure showing parent-child relationships (default: false)")
+  showHierarchy: z.boolean().optional().describe("Display tasks in hierarchical tree structure showing parent-child relationships (default: false)"),
+  ignoreFocus: z.boolean().optional().describe("When true (default), clears Focus mode to return all tasks. When false, respects current Focus and returns only focused tasks.")
 });
 
 export async function handler(args: z.infer<typeof schema>, _extra: RequestHandlerExtra<ServerRequest, ServerNotification>) {
@@ -29,7 +30,8 @@ export async function handler(args: z.infer<typeof schema>, _extra: RequestHandl
       perspectiveId: args.perspectiveId,
       hideCompleted: args.hideCompleted !== false, // Default to true
       limit: args.limit || 1000,
-      showHierarchy: args.showHierarchy || false // Default to false
+      showHierarchy: args.showHierarchy || false, // Default to false
+      ignoreFocus: args.ignoreFocus !== false // Default to true
     });
     
     return {
