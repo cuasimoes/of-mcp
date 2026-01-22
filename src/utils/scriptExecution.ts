@@ -6,7 +6,7 @@ import { tmpdir } from 'os';
 import { fileURLToPath } from 'url';
 import { dirname } from 'path';
 import { existsSync } from 'fs';
-import { categorizeError, StructuredError, isStructuredError } from './errors.js';
+import { categorizeError, StructuredError, isStructuredError, isExecException } from './errors.js';
 import { logger } from './logger.js';
 
 const execAsync = promisify(exec);
@@ -57,12 +57,13 @@ export async function executeJXA(script: string): Promise<any[]> {
       const preview = stdout.substring(0, 500);
       throw new Error(`Failed to parse JXA script output as JSON. Output preview: ${preview}`);
     }
-  } catch (error: any) {
+  } catch (error) {
     // Check for timeout (subprocess killed after timeout)
-    if (error.killed && error.signal === 'SIGTERM') {
+    if (isExecException(error) && error.killed && error.signal === 'SIGTERM') {
       throw new Error('Script execution timed out after 30 seconds. OmniFocus may be unresponsive.');
     }
-    log.error('Failed to execute JXA script', { error: error.message });
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    log.error('Failed to execute JXA script', { error: errorMessage });
     throw error;
   } finally {
     // Always clean up the temporary file
@@ -214,7 +215,7 @@ export async function executeOmniFocusScript(
         log.warn('Failed to cleanup temp file', { tempFile, error: (cleanupError as Error).message });
       }
     }
-  } catch (error: any) {
+  } catch (error) {
     // If it's already a structured error, use it directly
     const structuredError = isStructuredError(error) ? error : categorizeError(error);
 
