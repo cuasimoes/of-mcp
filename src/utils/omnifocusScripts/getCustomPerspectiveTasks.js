@@ -2,28 +2,38 @@
 // Based on improved user-provided code
 
 (() => {
+  // Declare variables needed for cleanup outside try block
+  let perspectiveName = null;
+  let perspectiveId = null;
+  let originalFocus = null;
+  let focusWasActive = false;
+  let focusCleared = false;
+  let ignoreFocus = true;
+  let focusTarget = null;
+
   try {
     // Get injected parameters
-    const perspectiveName = injectedArgs && injectedArgs.perspectiveName ? injectedArgs.perspectiveName : null;
-    const perspectiveId = injectedArgs && injectedArgs.perspectiveId ? injectedArgs.perspectiveId : null;
+    perspectiveName = injectedArgs && injectedArgs.perspectiveName ? injectedArgs.perspectiveName : null;
+    perspectiveId = injectedArgs && injectedArgs.perspectiveId ? injectedArgs.perspectiveId : null;
 
     // Get Focus state BEFORE any operations
-    const originalFocus = document.focus;
-    const focusWasActive = originalFocus !== null;
-    const focusTarget = focusWasActive ? {
-      name: originalFocus.name,
+    originalFocus = document.focus;
+    focusWasActive = originalFocus !== null;
+    focusTarget = focusWasActive ? {
+      name: originalFocus.name || '[unnamed]',
       type: originalFocus instanceof Project ? "project" :
             originalFocus instanceof Folder ? "folder" :
             originalFocus instanceof Tag ? "tag" : "unknown"
     } : null;
 
     // Clear Focus if ignoreFocus is true (default)
-    const ignoreFocus = injectedArgs && injectedArgs.ignoreFocus !== undefined
+    ignoreFocus = injectedArgs && injectedArgs.ignoreFocus !== undefined
       ? injectedArgs.ignoreFocus
       : true;
 
     if (ignoreFocus && focusWasActive) {
       document.focus = null;
+      focusCleared = true;
     }
 
     if (!perspectiveName && !perspectiveId) {
@@ -119,7 +129,7 @@
       taskMap: taskMap,
       focus: {
         wasActive: focusWasActive,
-        cleared: ignoreFocus && focusWasActive,
+        cleared: focusCleared,
         target: focusTarget
       }
     };
@@ -131,12 +141,22 @@
     const errorResult = {
       success: false,
       error: error.message || String(error),
-      perspectiveName: perspectiveName || null,
-      perspectiveId: perspectiveId || null,
+      perspectiveName: perspectiveName,
+      perspectiveId: perspectiveId,
       count: 0,
       taskMap: {}
     };
 
     return JSON.stringify(errorResult);
+
+  } finally {
+    // ALWAYS restore Focus if we cleared it
+    if (focusCleared && originalFocus) {
+      try {
+        document.focus = originalFocus;
+      } catch (restoreError) {
+        // Silently ignore restore errors - original operation result takes priority
+      }
+    }
   }
 })();

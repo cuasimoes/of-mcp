@@ -13,10 +13,12 @@ export interface GetCustomPerspectiveTasksOptions {
   ignoreFocus?: boolean;
 }
 
+type FocusTargetType = 'project' | 'folder' | 'tag' | 'unknown';
+
 interface FocusInfo {
   wasActive: boolean;
   cleared: boolean;
-  target: { name: string; type: string } | null;
+  target: { name: string; type: FocusTargetType } | null;
 }
 
 export async function getCustomPerspectiveTasks(options: GetCustomPerspectiveTasksOptions): Promise<string> {
@@ -85,7 +87,15 @@ export async function getCustomPerspectiveTasks(options: GetCustomPerspectiveTas
     }
 
   } catch (error) {
-    log.error('Error in getCustomPerspectiveTasks', { error: error instanceof Error ? error.message : String(error) });
+    log.error('Error in getCustomPerspectiveTasks', {
+      error: error instanceof Error ? error.message : String(error),
+      perspectiveName,
+      perspectiveId,
+      ignoreFocus,
+      hideCompleted,
+      showHierarchy,
+      limit
+    });
     return `❌ **Error**: ${error instanceof Error ? error.message : String(error)}`;
   }
 }
