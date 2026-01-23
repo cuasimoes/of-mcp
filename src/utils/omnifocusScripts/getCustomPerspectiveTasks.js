@@ -10,6 +10,7 @@
   let focusCleared = false;
   let ignoreFocus = true;
   let focusTarget = null;
+  let resultJson = null;
 
   try {
     // Get Focus state BEFORE any operations
@@ -130,7 +131,7 @@
       }
     };
 
-    return JSON.stringify(result);
+    resultJson = JSON.stringify(result);
 
   } catch (error) {
     // Error handling
@@ -143,7 +144,7 @@
       taskMap: {}
     };
 
-    return JSON.stringify(errorResult);
+    resultJson = JSON.stringify(errorResult);
 
   } finally {
     // ALWAYS restore Focus if we cleared it
@@ -151,8 +152,16 @@
       try {
         document.focus = originalFocus;
       } catch (restoreError) {
-        // Silently ignore restore errors - original operation result takes priority
+        // Surface restore failure in the response without overriding the primary result
+        try {
+          const parsed = JSON.parse(resultJson);
+          if (!parsed.focus) parsed.focus = {};
+          parsed.focus.restoreError = restoreError.message || String(restoreError);
+          resultJson = JSON.stringify(parsed);
+        } catch (e) { /* JSON re-serialization failed - keep original result */ }
       }
     }
   }
+
+  return resultJson;
 })();
