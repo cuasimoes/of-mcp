@@ -62,6 +62,13 @@ export async function getCustomPerspectiveTasks(options: GetCustomPerspectiveTas
 
     // Extract focus info from response
     const focusInfo: FocusInfo | undefined = data.focus;
+    if (focusInfo?.restoreError) {
+      log.warn('Focus mode restore failed', {
+        restoreError: focusInfo.restoreError,
+        perspectiveName: actualPerspectiveName,
+        focusTarget: focusInfo.target
+      });
+    }
 
     // Process taskMap data (hierarchical structure)
     const taskMap = data.taskMap || {};

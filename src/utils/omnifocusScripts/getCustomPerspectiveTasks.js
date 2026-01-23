@@ -141,7 +141,12 @@
       perspectiveName: perspectiveName,
       perspectiveId: perspectiveId,
       count: 0,
-      taskMap: {}
+      taskMap: {},
+      focus: {
+        wasActive: focusWasActive,
+        cleared: focusCleared,
+        target: focusTarget
+      }
     };
 
     resultJson = JSON.stringify(errorResult);
