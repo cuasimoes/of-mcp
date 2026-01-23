@@ -1,6 +1,16 @@
-# OmniFocus MCP Server - What's New (v1.30.3)
+# OmniFocus MCP Server - What's New (v1.30.4)
 
 > Summary of changes from Sprints 1-10 for AI assistants using this MCP server.
+
+## v1.30.4 Surface Focus restore errors (Issue #99)
+
+**Focus mode restore failures are now reported instead of silently swallowed:**
+- Refactored OmniJS script to use a result variable, allowing the `finally` block to append error info
+- If restoring Focus mode fails, `focus.restoreError` is included in the JSON response
+- The TypeScript layer now displays a warning when Focus restore fails
+- Primary operation results are preserved — restore errors are additive, not overriding
+
+---
 
 ## v1.30.3 Fix get_custom_perspective_tasks TypeError (Issue #97)
 

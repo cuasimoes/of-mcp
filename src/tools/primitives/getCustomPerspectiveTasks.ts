@@ -19,6 +19,7 @@ interface FocusInfo {
   wasActive: boolean;
   cleared: boolean;
   target: { name: string; type: FocusTargetType } | null;
+  restoreError?: string;
 }
 
 export async function getCustomPerspectiveTasks(options: GetCustomPerspectiveTasksOptions): Promise<string> {
@@ -61,6 +62,13 @@ export async function getCustomPerspectiveTasks(options: GetCustomPerspectiveTas
 
     // Extract focus info from response
     const focusInfo: FocusInfo | undefined = data.focus;
+    if (focusInfo?.restoreError) {
+      log.warn('Focus mode restore failed', {
+        restoreError: focusInfo.restoreError,
+        perspectiveName: actualPerspectiveName,
+        focusTarget: focusInfo.target
+      });
+    }
 
     // Process taskMap data (hierarchical structure)
     const taskMap = data.taskMap || {};
@@ -105,11 +113,16 @@ function formatFocusWarning(focusInfo?: FocusInfo): string {
   if (!focusInfo?.wasActive) {
     return '';
   }
+  let msg: string;
   if (focusInfo.cleared) {
-    return `> Focus mode was active on "${focusInfo.target?.name}" - temporarily cleared for complete results\n`;
+    msg = `> Focus mode was active on "${focusInfo.target?.name}" - temporarily cleared for complete results\n`;
   } else {
-    return `> **Focus mode active** on "${focusInfo.target?.name}" - showing filtered results only\n`;
+    msg = `> **Focus mode active** on "${focusInfo.target?.name}" - showing filtered results only\n`;
   }
+  if (focusInfo.restoreError) {
+    msg += `> ⚠️ Warning: Failed to restore Focus mode: ${focusInfo.restoreError}\n`;
+  }
+  return msg;
 }
 
 // Format hierarchical task display
