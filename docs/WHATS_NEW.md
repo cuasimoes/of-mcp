@@ -1,6 +1,15 @@
-# OmniFocus MCP Server - What's New (v1.30.2)
+# OmniFocus MCP Server - What's New (v1.30.3)
 
 > Summary of changes from Sprints 1-10 for AI assistants using this MCP server.
+
+## v1.30.3 Fix get_custom_perspective_tasks TypeError (Issue #97)
+
+**Fixed `get_custom_perspective_tasks` crashing when no Focus mode is active:**
+- `document.focus` returns `undefined` (not `null`) when no Focus is set in OmniFocus
+- The strict equality check (`!== null`) didn't catch `undefined`, causing a TypeError on property access
+- Changed to loose equality (`!= null`) which correctly handles both `null` and `undefined`
+
+---
 
 ## v1.30.2 Fix get_custom_perspective_tasks SyntaxError (Issue #95)
 

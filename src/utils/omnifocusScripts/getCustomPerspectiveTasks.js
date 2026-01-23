@@ -14,7 +14,7 @@
   try {
     // Get Focus state BEFORE any operations
     originalFocus = document.focus;
-    focusWasActive = originalFocus !== null;
+    focusWasActive = originalFocus != null;
     focusTarget = focusWasActive ? {
       name: originalFocus.name || '[unnamed]',
       type: originalFocus instanceof Project ? "project" :
