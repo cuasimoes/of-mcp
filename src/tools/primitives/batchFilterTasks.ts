@@ -15,7 +15,30 @@ export interface BatchFilterTasksOptions {
   // Due date filters
   dueToday?: boolean;
   dueThisWeek?: boolean;
+  dueThisMonth?: boolean;
+  dueBefore?: string;
+  dueAfter?: string;
   overdue?: boolean;
+
+  // Defer date filters
+  deferToday?: boolean;
+  deferThisWeek?: boolean;
+  deferBefore?: string;
+  deferAfter?: string;
+  deferAvailable?: boolean;
+
+  // Planned date filters
+  plannedToday?: boolean;
+  plannedThisWeek?: boolean;
+  plannedBefore?: string;
+  plannedAfter?: string;
+
+  // Completion date filters
+  completedToday?: boolean;
+  completedThisWeek?: boolean;
+  completedThisMonth?: boolean;
+  completedBefore?: string;
+  completedAfter?: string;
 
   // Other filters
   flagged?: boolean;
@@ -82,8 +105,28 @@ function formatBatchResults(data: any, options: BatchFilterTasksOptions): string
     filterParts.push(`Flagged: ${options.flagged ? 'Yes' : 'No'}`);
   }
   if (options.dueToday) filterParts.push('Due: Today');
-  if (options.dueThisWeek) filterParts.push('Due: This Week');
-  if (options.overdue) filterParts.push('Overdue only');
+  else if (options.dueThisWeek) filterParts.push('Due: This Week');
+  else if (options.dueThisMonth) filterParts.push('Due: This Month');
+  else if (options.overdue) filterParts.push('Due: Overdue');
+  if (options.dueBefore) filterParts.push(`Due before: ${options.dueBefore}`);
+  if (options.dueAfter) filterParts.push(`Due after: ${options.dueAfter}`);
+
+  if (options.deferAvailable) filterParts.push('Defer: Available');
+  else if (options.deferToday) filterParts.push('Defer: Today');
+  else if (options.deferThisWeek) filterParts.push('Defer: This Week');
+  if (options.deferBefore) filterParts.push(`Defer before: ${options.deferBefore}`);
+  if (options.deferAfter) filterParts.push(`Defer after: ${options.deferAfter}`);
+
+  if (options.plannedToday) filterParts.push('Planned: Today');
+  else if (options.plannedThisWeek) filterParts.push('Planned: This Week');
+  if (options.plannedBefore) filterParts.push(`Planned before: ${options.plannedBefore}`);
+  if (options.plannedAfter) filterParts.push(`Planned after: ${options.plannedAfter}`);
+
+  if (options.completedToday) filterParts.push('Completed: Today');
+  else if (options.completedThisWeek) filterParts.push('Completed: This Week');
+  else if (options.completedThisMonth) filterParts.push('Completed: This Month');
+  if (options.completedBefore) filterParts.push(`Completed before: ${options.completedBefore}`);
+  if (options.completedAfter) filterParts.push(`Completed after: ${options.completedAfter}`);
 
   if (filterParts.length > 0) {
     output += `**Common Filters**: ${filterParts.join(' | ')}\n\n`;
@@ -163,6 +206,16 @@ function formatTask(task: any): string {
   const deferDateStr = formatDateSafe(task.deferDate);
   if (deferDateStr) {
     output += `  🚀 Defer: ${deferDateStr}\n`;
+  }
+
+  const plannedDateStr = formatDateSafe(task.plannedDate);
+  if (plannedDateStr) {
+    output += `  📋 Planned: ${plannedDateStr}\n`;
+  }
+
+  const completedDateStr = formatDateSafe(task.completedDate);
+  if (completedDateStr) {
+    output += `  ✅ Done: ${completedDateStr}\n`;
   }
 
   // Tags
