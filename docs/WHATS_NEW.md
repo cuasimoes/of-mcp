@@ -1,6 +1,20 @@
-# OmniFocus MCP Server - What's New (v1.30.4)
+# OmniFocus MCP Server - What's New (v1.30.5)
 
 > Summary of changes from Sprints 1-10 for AI assistants using this MCP server.
+
+## v1.30.5 Implement missing date filters and fix null-check bug (PR #101)
+
+**13 date filters in `filter_tasks` now work correctly:**
+- Implemented 11 date filters that were defined in the tool schema but never wired up in the OmniJS script:
+  - **Due date**: `dueToday`, `dueThisWeek`, `dueThisMonth`, `dueBefore`, `dueAfter`, `overdue`
+  - **Defer date**: `deferToday`, `deferThisWeek`, `deferBefore`, `deferAfter`, `deferAvailable`
+- Fixed `completedThisWeek` and `completedThisMonth` filters that were parsed but never applied — previously these returned all completed tasks instead of filtering by date range
+- Fixed null-check bug in `plannedBefore`, `plannedAfter`, `completedBefore`, and `completedAfter` filters — tasks with null dates were incorrectly included in results due to JavaScript short-circuit evaluation
+- Added `isThisMonth()` helper function for month-based date comparisons
+
+*Contributed by @vesan*
+
+---
 
 ## v1.30.4 Surface Focus restore errors (Issue #99)
 
