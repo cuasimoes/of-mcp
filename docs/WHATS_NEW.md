@@ -1,6 +1,20 @@
-# OmniFocus MCP Server - What's New (v1.30.5)
+# OmniFocus MCP Server - What's New (v1.30.6)
 
 > Summary of changes from Sprints 1-10 for AI assistants using this MCP server.
+
+## v1.30.6 Bring batch_filter_tasks to date filter parity (Issue #103)
+
+**`batch_filter_tasks` now supports the same date filters as `filter_tasks`:**
+- Added 16 date filter parameters across due, defer, planned, and completion date categories
+- Added `isThisMonth()` helper for month-based comparisons
+- Added `wantsCompletedTasks` logic so completion date filters correctly include completed tasks
+- All range filters (`*Before`, `*After`) use the early-return null-check pattern from v1.30.5
+- Added `plannedDate` and `completedDate` to task output and sort options
+- Updated Zod schema and TypeScript interface for full type safety
+
+**Intentionally excluded** from batch (project-scoped by design): `searchText`, tag filters, estimate filters, `inInbox`, `countOnly`, `perspective`.
+
+---
 
 ## v1.30.5 Implement missing date filters and fix null-check bug (PR #101)
 
