@@ -24,6 +24,21 @@
       plannedBefore: args.plannedBefore || null,
       plannedAfter: args.plannedAfter || null,
 
+      // Due date filters
+      dueToday: args.dueToday || false,
+      dueThisWeek: args.dueThisWeek || false,
+      dueThisMonth: args.dueThisMonth || false,
+      dueBefore: args.dueBefore || null,
+      dueAfter: args.dueAfter || null,
+      overdue: args.overdue || false,
+
+      // Defer date filters
+      deferToday: args.deferToday || false,
+      deferThisWeek: args.deferThisWeek || false,
+      deferBefore: args.deferBefore || null,
+      deferAfter: args.deferAfter || null,
+      deferAvailable: args.deferAvailable || false,
+
       // Other filters
       projectFilter: args.projectFilter || null,
       projectId: args.projectId || null,
@@ -97,6 +112,14 @@
       endOfWeek.setDate(startOfWeek.getDate() + 7);
       const checkDate = new Date(date);
       return checkDate >= startOfWeek && checkDate < endOfWeek;
+    }
+
+    function isThisMonth(date) {
+      if (!date) return false;
+      const now = new Date();
+      const checkDate = new Date(date);
+      return checkDate.getMonth() === now.getMonth() &&
+             checkDate.getFullYear() === now.getFullYear();
     }
 
     // Get all tasks
@@ -229,13 +252,19 @@
           if (filters.completedYesterday && !isYesterday(task.completionDate)) {
             return false;
           }
-          if (filters.completedBefore && task.completionDate &&
-              new Date(task.completionDate) >= new Date(filters.completedBefore)) {
+          if (filters.completedThisWeek && !isThisWeek(task.completionDate)) {
             return false;
           }
-          if (filters.completedAfter && task.completionDate &&
-              new Date(task.completionDate) <= new Date(filters.completedAfter)) {
+          if (filters.completedThisMonth && !isThisMonth(task.completionDate)) {
             return false;
+          }
+          if (filters.completedBefore) {
+            if (!task.completionDate) return false;
+            if (new Date(task.completionDate) >= new Date(filters.completedBefore)) return false;
+          }
+          if (filters.completedAfter) {
+            if (!task.completionDate) return false;
+            if (new Date(task.completionDate) <= new Date(filters.completedAfter)) return false;
           }
         }
 
@@ -250,13 +279,56 @@
             return false;
           }
         }
-        if (filters.plannedBefore && task.plannedDate &&
-            new Date(task.plannedDate) >= new Date(filters.plannedBefore)) {
+        if (filters.plannedBefore) {
+          if (!task.plannedDate) return false;
+          if (new Date(task.plannedDate) >= new Date(filters.plannedBefore)) return false;
+        }
+        if (filters.plannedAfter) {
+          if (!task.plannedDate) return false;
+          if (new Date(task.plannedDate) <= new Date(filters.plannedAfter)) return false;
+        }
+
+        // Due date filters
+        if (filters.dueToday && !isToday(task.dueDate)) {
           return false;
         }
-        if (filters.plannedAfter && task.plannedDate &&
-            new Date(task.plannedDate) <= new Date(filters.plannedAfter)) {
+        if (filters.dueThisWeek && !isThisWeek(task.dueDate)) {
           return false;
+        }
+        if (filters.dueThisMonth && !isThisMonth(task.dueDate)) {
+          return false;
+        }
+        if (filters.overdue) {
+          if (!task.dueDate) return false;
+          if (new Date(task.dueDate) >= new Date()) return false;
+        }
+        if (filters.dueBefore) {
+          if (!task.dueDate) return false;
+          if (new Date(task.dueDate) >= new Date(filters.dueBefore)) return false;
+        }
+        if (filters.dueAfter) {
+          if (!task.dueDate) return false;
+          if (new Date(task.dueDate) <= new Date(filters.dueAfter)) return false;
+        }
+
+        // Defer date filters
+        if (filters.deferToday && !isToday(task.deferDate)) {
+          return false;
+        }
+        if (filters.deferThisWeek && !isThisWeek(task.deferDate)) {
+          return false;
+        }
+        if (filters.deferBefore) {
+          if (!task.deferDate) return false;
+          if (new Date(task.deferDate) >= new Date(filters.deferBefore)) return false;
+        }
+        if (filters.deferAfter) {
+          if (!task.deferDate) return false;
+          if (new Date(task.deferDate) <= new Date(filters.deferAfter)) return false;
+        }
+        if (filters.deferAvailable) {
+          if (!task.deferDate) return false;
+          if (new Date(task.deferDate) > new Date()) return false;
         }
 
         return true;
