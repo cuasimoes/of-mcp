@@ -4,6 +4,12 @@
     // Get parameters
     const args = typeof injectedArgs !== 'undefined' ? injectedArgs : {};
 
+    // Error tracking - count errors instead of silently swallowing them
+    let filterErrorCount = 0;
+    let serializationErrorCount = 0;
+    const errorSamples = [];
+    const MAX_ERROR_SAMPLES = 3;
+
     const filters = {
       taskStatus: args.taskStatus || null,
       perspective: args.perspective || "all",
@@ -333,6 +339,10 @@
 
         return true;
       } catch (error) {
+        filterErrorCount++;
+        if (errorSamples.length < MAX_ERROR_SAMPLES) {
+          errorSamples.push('Filter: ' + error);
+        }
         return false;
       }
     });
@@ -431,9 +441,20 @@
 
         exportData.tasks.push(taskData);
       } catch (taskError) {
-        // Skip tasks with processing errors
+        serializationErrorCount++;
+        if (errorSamples.length < MAX_ERROR_SAMPLES) {
+          errorSamples.push('Serialize "' + task.name + '": ' + taskError);
+        }
       }
     });
+
+    if (filterErrorCount > 0 || serializationErrorCount > 0) {
+      exportData.processingErrors = {
+        filterErrors: filterErrorCount,
+        serializationErrors: serializationErrorCount,
+        samples: errorSamples
+      };
+    }
 
     return JSON.stringify(exportData);
 
