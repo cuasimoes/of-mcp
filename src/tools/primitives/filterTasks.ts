@@ -115,6 +115,10 @@ export async function filterTasks(options: FilterTasksOptions = {}): Promise<str
         throw new Error(data.error);
       }
 
+      if (data.processingErrors) {
+        log.warn('Filter returned processing errors', data.processingErrors);
+      }
+
       // Handle countOnly mode - return simplified output
       if (data.countOnly) {
         const filterSummary = buildFilterSummary(options);
@@ -179,6 +183,25 @@ export async function filterTasks(options: FilterTasksOptions = {}): Promise<str
         }
       } else {
         output += "No task data available\n";
+      }
+
+      // Display processing error warnings if any tasks were silently excluded
+      if (data.processingErrors) {
+        const pe = data.processingErrors;
+        const totalErrors = (pe.filterErrors || 0) + (pe.serializationErrors || 0);
+        if (totalErrors > 0) {
+          output += `\n⚠️ **Processing Warnings**:\n`;
+          if (pe.filterErrors > 0) {
+            output += `- ${pe.filterErrors} task${pe.filterErrors === 1 ? '' : 's'} excluded due to filter evaluation errors\n`;
+          }
+          if (pe.serializationErrors > 0) {
+            output += `- ${pe.serializationErrors} task${pe.serializationErrors === 1 ? '' : 's'} dropped due to serialization errors\n`;
+          }
+          if (pe.samples && pe.samples.length > 0) {
+            output += `- Samples: ${pe.samples.join('; ')}\n`;
+          }
+          output += '\n';
+        }
       }
 
       return output;

@@ -3,6 +3,13 @@
   try {
     const args = typeof injectedArgs !== 'undefined' ? injectedArgs : {};
 
+    // Error tracking - count errors instead of silently swallowing them
+    let filterErrorCount = 0;
+    let serializationErrorCount = 0;
+    let projectErrorCount = 0;
+    const errorSamples = [];
+    const MAX_ERROR_SAMPLES = 3;
+
     const projectIds = args.projectIds || [];
     const projectNames = args.projectNames || [];
     const taskStatus = args.taskStatus || null;
@@ -273,11 +280,26 @@
 
             return true;
           } catch (e) {
+            filterErrorCount++;
+            if (errorSamples.length < MAX_ERROR_SAMPLES) {
+              errorSamples.push('Filter in "' + project.name + '": ' + e);
+            }
             return false;
           }
         });
       } catch (e) {
-        // Skip project if error accessing tasks
+        projectErrorCount++;
+        if (errorSamples.length < MAX_ERROR_SAMPLES) {
+          errorSamples.push('Project "' + project.name + '": ' + e);
+        }
+        projectResults.push({
+          projectId: project.id.primaryKey,
+          projectName: project.name,
+          error: 'Failed to access tasks: ' + e,
+          taskCount: 0,
+          totalCount: 0,
+          tasks: []
+        });
       }
 
       // Sort tasks
@@ -352,6 +374,10 @@
             }))
           };
         } catch (e) {
+          serializationErrorCount++;
+          if (errorSamples.length < MAX_ERROR_SAMPLES) {
+            errorSamples.push('Serialize in "' + project.name + '": ' + e);
+          }
           return null;
         }
       }).filter(t => t !== null);
@@ -365,13 +391,24 @@
       });
     }
 
-    return JSON.stringify({
+    const response = {
       success: true,
       projectResults: projectResults,
       notFound: notFound,
       totalProjects: projectResults.length,
       totalTasks: projectResults.reduce((sum, p) => sum + p.taskCount, 0)
-    });
+    };
+
+    if (filterErrorCount > 0 || serializationErrorCount > 0 || projectErrorCount > 0) {
+      response.processingErrors = {
+        filterErrors: filterErrorCount,
+        serializationErrors: serializationErrorCount,
+        projectErrors: projectErrorCount,
+        samples: errorSamples
+      };
+    }
+
+    return JSON.stringify(response);
 
   } catch (error) {
     return JSON.stringify({
