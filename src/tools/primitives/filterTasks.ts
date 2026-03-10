@@ -127,6 +127,18 @@ export async function filterTasks(options: FilterTasksOptions = {}): Promise<str
         if (filterSummary) {
           output += `**Filter**: ${filterSummary}\n`;
         }
+        // Display processing error warnings if any tasks were silently excluded
+        if (data.processingErrors) {
+          const pe = data.processingErrors;
+          if ((pe.filterErrors || 0) > 0) {
+            output += `\n⚠️ **Processing Warnings**:\n`;
+            output += `- ${pe.filterErrors} task${pe.filterErrors === 1 ? '' : 's'} excluded due to filter evaluation errors\n`;
+            if (pe.samples && pe.samples.length > 0) {
+              output += `- Samples: ${pe.samples.join('; ')}\n`;
+            }
+            output += '\n';
+          }
+        }
         return output;
       }
 

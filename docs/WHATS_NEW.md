@@ -1,6 +1,15 @@
-# OmniFocus MCP Server - What's New (v1.30.7)
+# OmniFocus MCP Server - What's New (v1.30.8)
 
 > Summary of changes from Sprints 1-10 for AI assistants using this MCP server.
+
+## v1.30.8 Fix countOnly mode discarding processing errors (Issue #109)
+
+**Bug fix for `filter_tasks` with `countOnly: true`:**
+- The `countOnly` code path now includes `processingErrors` when filter evaluation errors occur
+- Count-only results display the same warning section as full results when tasks are silently excluded
+- Previously, filter errors were silently discarded in count-only mode, giving inaccurate counts with no warning
+
+---
 
 ## v1.30.7 Surface silent catch block errors in filter operations (Issue #104)
 

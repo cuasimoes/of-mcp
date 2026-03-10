@@ -381,7 +381,7 @@
 
     // countOnly mode - return just the count without task data
     if (filters.countOnly) {
-      return JSON.stringify({
+      const result = {
         count: totalMatchingCount,
         countOnly: true,
         filters: {
@@ -395,7 +395,15 @@
           flagged: filters.flagged,
           inInbox: filters.inInbox
         }
-      });
+      };
+      if (filterErrorCount > 0) {
+        result.processingErrors = {
+          filterErrors: filterErrorCount,
+          serializationErrors: 0,
+          samples: errorSamples
+        };
+      }
+      return JSON.stringify(result);
     }
 
     // Limit results
