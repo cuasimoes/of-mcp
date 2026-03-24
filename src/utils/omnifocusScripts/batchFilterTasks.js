@@ -282,7 +282,7 @@
           } catch (e) {
             filterErrorCount++;
             if (errorSamples.length < MAX_ERROR_SAMPLES) {
-              errorSamples.push('Filter in "' + project.name + '": ' + e);
+              errorSamples.push('Filter in "' + project.name + '": ' + (e.message || String(e)));
             }
             return false;
           }
@@ -290,16 +290,17 @@
       } catch (e) {
         projectErrorCount++;
         if (errorSamples.length < MAX_ERROR_SAMPLES) {
-          errorSamples.push('Project "' + project.name + '": ' + e);
+          errorSamples.push('Project "' + project.name + '": ' + (e.message || String(e)));
         }
         projectResults.push({
           projectId: project.id.primaryKey,
           projectName: project.name,
-          error: 'Failed to access tasks: ' + e,
+          error: 'Failed to access tasks: ' + (e.message || String(e)),
           taskCount: 0,
           totalCount: 0,
           tasks: []
         });
+        continue;
       }
 
       // Sort tasks
@@ -376,7 +377,7 @@
         } catch (e) {
           serializationErrorCount++;
           if (errorSamples.length < MAX_ERROR_SAMPLES) {
-            errorSamples.push('Serialize in "' + project.name + '": ' + e);
+            errorSamples.push('Serialize in "' + project.name + '": ' + (e.message || String(e)));
           }
           return null;
         }

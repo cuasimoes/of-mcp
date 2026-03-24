@@ -2,6 +2,7 @@ import { executeOmniFocusScript } from '../../utils/scriptExecution.js';
 import { queryCache } from '../../utils/cache.js';
 import { logger } from '../../utils/logger.js';
 import { formatDateSafe } from '../../utils/dateUtils.js';
+import { formatProcessingWarnings } from '../../utils/formatUtils.js';
 
 const log = logger.child('filterTasks');
 
@@ -127,6 +128,8 @@ export async function filterTasks(options: FilterTasksOptions = {}): Promise<str
         if (filterSummary) {
           output += `**Filter**: ${filterSummary}\n`;
         }
+        const warnings = formatProcessingWarnings(data.processingErrors);
+        if (warnings) output += `\n${warnings}`;
         return output;
       }
 
@@ -185,24 +188,8 @@ export async function filterTasks(options: FilterTasksOptions = {}): Promise<str
         output += "No task data available\n";
       }
 
-      // Display processing error warnings if any tasks were silently excluded
-      if (data.processingErrors) {
-        const pe = data.processingErrors;
-        const totalErrors = (pe.filterErrors || 0) + (pe.serializationErrors || 0);
-        if (totalErrors > 0) {
-          output += `\n⚠️ **Processing Warnings**:\n`;
-          if (pe.filterErrors > 0) {
-            output += `- ${pe.filterErrors} task${pe.filterErrors === 1 ? '' : 's'} excluded due to filter evaluation errors\n`;
-          }
-          if (pe.serializationErrors > 0) {
-            output += `- ${pe.serializationErrors} task${pe.serializationErrors === 1 ? '' : 's'} dropped due to serialization errors\n`;
-          }
-          if (pe.samples && pe.samples.length > 0) {
-            output += `- Samples: ${pe.samples.join('; ')}\n`;
-          }
-          output += '\n';
-        }
-      }
+      const warnings = formatProcessingWarnings(data.processingErrors);
+      if (warnings) output += `\n${warnings}`;
 
       return output;
     }

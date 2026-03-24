@@ -341,7 +341,7 @@
       } catch (error) {
         filterErrorCount++;
         if (errorSamples.length < MAX_ERROR_SAMPLES) {
-          errorSamples.push('Filter: ' + error);
+          errorSamples.push('Filter: ' + (error.message || String(error)));
         }
         return false;
       }
@@ -381,7 +381,7 @@
 
     // countOnly mode - return just the count without task data
     if (filters.countOnly) {
-      return JSON.stringify({
+      const result = {
         count: totalMatchingCount,
         countOnly: true,
         filters: {
@@ -395,7 +395,15 @@
           flagged: filters.flagged,
           inInbox: filters.inInbox
         }
-      });
+      };
+      if (filterErrorCount > 0) {
+        result.processingErrors = {
+          filterErrors: filterErrorCount,
+          serializationErrors: 0,
+          samples: errorSamples
+        };
+      }
+      return JSON.stringify(result);
     }
 
     // Limit results
@@ -443,7 +451,7 @@
       } catch (taskError) {
         serializationErrorCount++;
         if (errorSamples.length < MAX_ERROR_SAMPLES) {
-          errorSamples.push('Serialize "' + task.name + '": ' + taskError);
+          errorSamples.push('Serialize "' + (task.name || 'unknown') + '": ' + (taskError.message || String(taskError)));
         }
       }
     });
