@@ -1,7 +1,6 @@
 import { executeOmniFocusScript } from '../../utils/scriptExecution.js';
 import { logger } from '../../utils/logger.js';
 import { formatDateSafe } from '../../utils/dateUtils.js';
-import { formatProcessingWarnings } from '../../utils/formatUtils.js';
 
 const log = logger.child('batchFilterTasks');
 
@@ -82,16 +81,8 @@ export async function batchFilterTasks(options: BatchFilterTasksOptions = {}): P
         throw new Error(data.error);
       }
 
-      // Log processing errors from any project
-      if (data.projectResults) {
-        for (const pr of data.projectResults) {
-          if (pr.processingErrors) {
-            log.warn('Batch filter returned processing errors', {
-              project: pr.projectName,
-              ...pr.processingErrors
-            });
-          }
-        }
+      if (data.processingErrors) {
+        log.warn('Batch filter returned processing errors', data.processingErrors);
       }
 
       return formatBatchResults(data, options);
@@ -149,6 +140,29 @@ function formatBatchResults(data: any, options: BatchFilterTasksOptions): string
   const projectCount = data.projectResults?.length || 0;
   const totalTasks = data.projectResults?.reduce((sum: number, p: any) => sum + (p.taskCount || 0), 0) || 0;
   output += `**Summary**: ${totalTasks} tasks across ${projectCount} projects\n\n`;
+
+  // Display processing error warnings if any tasks were silently excluded
+  if (data.processingErrors) {
+    const pe = data.processingErrors;
+    const totalErrors = (pe.filterErrors || 0) + (pe.serializationErrors || 0) + (pe.projectErrors || 0);
+    if (totalErrors > 0) {
+      output += `⚠️ **Processing Warnings**:\n`;
+      if (pe.filterErrors > 0) {
+        output += `- ${pe.filterErrors} task${pe.filterErrors === 1 ? '' : 's'} excluded due to filter evaluation errors\n`;
+      }
+      if (pe.serializationErrors > 0) {
+        output += `- ${pe.serializationErrors} task${pe.serializationErrors === 1 ? '' : 's'} dropped due to serialization errors\n`;
+      }
+      if (pe.projectErrors > 0) {
+        output += `- ${pe.projectErrors} project${pe.projectErrors === 1 ? '' : 's'} failed to load\n`;
+      }
+      if (pe.samples && pe.samples.length > 0) {
+        output += `- Samples: ${pe.samples.join('; ')}\n`;
+      }
+      output += '\n';
+    }
+  }
+
   output += `---\n\n`;
 
   // Results by project
@@ -165,17 +179,9 @@ function formatBatchResults(data: any, options: BatchFilterTasksOptions): string
       }
       output += `\n\n`;
 
-      // Show processing errors for this project
-      if (projectResult.processingErrors) {
-        const pe = projectResult.processingErrors;
-        if (pe.projectAccessError) {
-          output += `⚠️ **Error**: ${pe.projectAccessError}\n\n`;
-        } else {
-          output += formatProcessingWarnings(pe);
-        }
-      }
-
-      if (tasks.length === 0) {
+      if (projectResult.error) {
+        output += `⚠️ _Error: ${projectResult.error}_\n\n`;
+      } else if (tasks.length === 0) {
         output += `_No matching tasks_\n\n`;
       } else {
         for (const task of tasks) {

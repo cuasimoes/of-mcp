@@ -2,17 +2,19 @@
 
 > Summary of changes from Sprints 1-10 for AI assistants using this MCP server.
 
-## v1.30.7 Surface processing errors in filter operations (Issue #109)
+## v1.30.7 Surface silent catch block errors in filter operations (Issues #104, #109)
 
-**Bug fix for silent error swallowing in `filter_tasks` and `batch_filter_tasks`:**
-- Added `filterErrorCount`/`filterErrorSamples` tracking in `filterTasks.js` filter catch block — errors are now counted and sampled instead of silently returning `false`
-- Added `serializationErrorCount`/`serializationErrorSamples` tracking in `filterTasks.js` serialization catch block — tasks dropped during serialization are now tracked
+**Improved error visibility in `filter_tasks` and `batch_filter_tasks`:**
+- Per-task filter errors are now counted and reported instead of silently excluding tasks
+- Task serialization errors are now counted and reported instead of silently dropping tasks
+- Project-level errors in batch operations now produce a result entry with error details instead of silently skipping the project
 - `countOnly` mode now includes `processingErrors` in its response when filter evaluation errors occur
-- Non-countOnly mode now includes `processingErrors` with both filter and serialization error counts
-- Added `formatProcessingWarnings()` helper in `filterTasks.ts` for consistent warning display across both code paths
-- `batch_filter_tasks`: All 3 catch blocks (filter, project access, serialization) now track errors per-project
-- `batchFilterTasks.ts` displays per-project processing warnings including project access failures
-- Previously, all processing errors were silently discarded, giving inaccurate counts/results with no warning
+- Warning section displayed in output when any tasks were excluded due to processing errors
+- Up to 3 sample error messages captured for troubleshooting (with reliable `error.message` coercion)
+- Server-side `log.warn` emitted when processing errors are present
+- Shared `formatProcessingWarnings()` utility in `src/utils/formatUtils.ts` for consistent warning display
+
+**Impact:** Error-free operations produce identical output to before. Warnings only appear when errors actually occur.
 
 ---
 

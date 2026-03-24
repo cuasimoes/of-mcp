@@ -116,7 +116,6 @@ export async function filterTasks(options: FilterTasksOptions = {}): Promise<str
         throw new Error(data.error);
       }
 
-      // Log processing errors if present
       if (data.processingErrors) {
         log.warn('Filter returned processing errors', data.processingErrors);
       }
@@ -191,6 +190,7 @@ export async function filterTasks(options: FilterTasksOptions = {}): Promise<str
 
       const warnings = formatProcessingWarnings(data.processingErrors);
       if (warnings) output += `\n${warnings}`;
+
       return output;
     }
 

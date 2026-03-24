@@ -4,6 +4,12 @@
     // Get parameters
     const args = typeof injectedArgs !== 'undefined' ? injectedArgs : {};
 
+    // Error tracking - count errors instead of silently swallowing them
+    let filterErrorCount = 0;
+    let serializationErrorCount = 0;
+    const errorSamples = [];
+    const MAX_ERROR_SAMPLES = 3;
+
     const filters = {
       taskStatus: args.taskStatus || null,
       perspective: args.perspective || "all",
@@ -156,10 +162,6 @@
         baseTasks = availableTasks;
         break;
     }
-
-    // Error tracking for filter evaluation
-    let filterErrorCount = 0;
-    const filterErrorSamples = [];
 
     // Apply all filters
     let filteredTasks = baseTasks.filter(task => {
@@ -338,8 +340,8 @@
         return true;
       } catch (error) {
         filterErrorCount++;
-        if (filterErrorSamples.length < 3) {
-          filterErrorSamples.push(`Task "${task.name || 'unknown'}": ${error.message || String(error)}`);
+        if (errorSamples.length < MAX_ERROR_SAMPLES) {
+          errorSamples.push('Filter: ' + (error.message || String(error)));
         }
         return false;
       }
@@ -398,7 +400,7 @@
         result.processingErrors = {
           filterErrors: filterErrorCount,
           serializationErrors: 0,
-          samples: filterErrorSamples
+          samples: errorSamples
         };
       }
       return JSON.stringify(result);
@@ -418,10 +420,6 @@
       sortedBy: filters.sortBy,
       sortOrder: filters.sortOrder
     };
-
-    // Error tracking for serialization
-    let serializationErrorCount = 0;
-    const serializationErrorSamples = [];
 
     // Process each task
     filteredTasks.forEach(task => {
@@ -452,18 +450,17 @@
         exportData.tasks.push(taskData);
       } catch (taskError) {
         serializationErrorCount++;
-        if (serializationErrorSamples.length < 3) {
-          serializationErrorSamples.push(`Task "${task.name || 'unknown'}": ${taskError.message || String(taskError)}`);
+        if (errorSamples.length < MAX_ERROR_SAMPLES) {
+          errorSamples.push('Serialize "' + (task.name || 'unknown') + '": ' + (taskError.message || String(taskError)));
         }
       }
     });
 
-    // Attach processing errors if any occurred
     if (filterErrorCount > 0 || serializationErrorCount > 0) {
       exportData.processingErrors = {
         filterErrors: filterErrorCount,
         serializationErrors: serializationErrorCount,
-        samples: filterErrorSamples.concat(serializationErrorSamples)
+        samples: errorSamples
       };
     }
 

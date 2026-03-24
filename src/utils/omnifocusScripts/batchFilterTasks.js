@@ -3,6 +3,13 @@
   try {
     const args = typeof injectedArgs !== 'undefined' ? injectedArgs : {};
 
+    // Error tracking - count errors instead of silently swallowing them
+    let filterErrorCount = 0;
+    let serializationErrorCount = 0;
+    let projectErrorCount = 0;
+    const errorSamples = [];
+    const MAX_ERROR_SAMPLES = 3;
+
     const projectIds = args.projectIds || [];
     const projectNames = args.projectNames || [];
     const taskStatus = args.taskStatus || null;
@@ -155,15 +162,8 @@
     const projectResults = [];
 
     for (const project of projectsToFilter) {
-      // Error tracking per project
-      let filterErrorCount = 0;
-      const filterErrorSamples = [];
-      let serializationErrorCount = 0;
-      const serializationErrorSamples = [];
-
       // Get tasks for this project
       let tasks = [];
-      let projectAccessError = null;
       try {
         // Get all tasks in project (including from nested action groups)
         const projectTasks = project.flattenedTasks || [];
@@ -281,14 +281,26 @@
             return true;
           } catch (e) {
             filterErrorCount++;
-            if (filterErrorSamples.length < 3) {
-              filterErrorSamples.push(`Task "${task.name || 'unknown'}": ${e.message || String(e)}`);
+            if (errorSamples.length < MAX_ERROR_SAMPLES) {
+              errorSamples.push('Filter in "' + project.name + '": ' + (e.message || String(e)));
             }
             return false;
           }
         });
       } catch (e) {
-        projectAccessError = `Error accessing project tasks: ${e.message || String(e)}`;
+        projectErrorCount++;
+        if (errorSamples.length < MAX_ERROR_SAMPLES) {
+          errorSamples.push('Project "' + project.name + '": ' + (e.message || String(e)));
+        }
+        projectResults.push({
+          projectId: project.id.primaryKey,
+          projectName: project.name,
+          error: 'Failed to access tasks: ' + (e.message || String(e)),
+          taskCount: 0,
+          totalCount: 0,
+          tasks: []
+        });
+        continue;
       }
 
       // Sort tasks
@@ -364,44 +376,40 @@
           };
         } catch (e) {
           serializationErrorCount++;
-          if (serializationErrorSamples.length < 3) {
-            serializationErrorSamples.push(`Task "${task.name || 'unknown'}": ${e.message || String(e)}`);
+          if (errorSamples.length < MAX_ERROR_SAMPLES) {
+            errorSamples.push('Serialize in "' + project.name + '": ' + (e.message || String(e)));
           }
           return null;
         }
       }).filter(t => t !== null);
 
-      const projectResult = {
+      projectResults.push({
         projectId: project.id.primaryKey,
         projectName: project.name,
-        taskCount: projectAccessError ? null : taskData.length,
-        totalCount: projectAccessError ? null : totalCount,
+        taskCount: taskData.length,
+        totalCount: totalCount,
         tasks: taskData
-      };
-      if (projectAccessError) {
-        projectResult.processingErrors = {
-          projectAccessError: projectAccessError,
-          filterErrors: 0,
-          serializationErrors: 0,
-          samples: []
-        };
-      } else if (filterErrorCount > 0 || serializationErrorCount > 0) {
-        projectResult.processingErrors = {
-          filterErrors: filterErrorCount,
-          serializationErrors: serializationErrorCount,
-          samples: filterErrorSamples.concat(serializationErrorSamples)
-        };
-      }
-      projectResults.push(projectResult);
+      });
     }
 
-    return JSON.stringify({
+    const response = {
       success: true,
       projectResults: projectResults,
       notFound: notFound,
       totalProjects: projectResults.length,
       totalTasks: projectResults.reduce((sum, p) => sum + p.taskCount, 0)
-    });
+    };
+
+    if (filterErrorCount > 0 || serializationErrorCount > 0 || projectErrorCount > 0) {
+      response.processingErrors = {
+        filterErrors: filterErrorCount,
+        serializationErrors: serializationErrorCount,
+        projectErrors: projectErrorCount,
+        samples: errorSamples
+      };
+    }
+
+    return JSON.stringify(response);
 
   } catch (error) {
     return JSON.stringify({
