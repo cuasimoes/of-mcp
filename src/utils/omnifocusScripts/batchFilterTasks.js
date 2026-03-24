@@ -155,8 +155,15 @@
     const projectResults = [];
 
     for (const project of projectsToFilter) {
+      // Error tracking per project
+      let filterErrorCount = 0;
+      const filterErrorSamples = [];
+      let serializationErrorCount = 0;
+      const serializationErrorSamples = [];
+
       // Get tasks for this project
       let tasks = [];
+      let projectAccessError = null;
       try {
         // Get all tasks in project (including from nested action groups)
         const projectTasks = project.flattenedTasks || [];
@@ -273,11 +280,15 @@
 
             return true;
           } catch (e) {
+            filterErrorCount++;
+            if (filterErrorSamples.length < 3) {
+              filterErrorSamples.push(`Task "${task.name || 'unknown'}": ${e}`);
+            }
             return false;
           }
         });
       } catch (e) {
-        // Skip project if error accessing tasks
+        projectAccessError = `Error accessing project tasks: ${e}`;
       }
 
       // Sort tasks
@@ -352,17 +363,36 @@
             }))
           };
         } catch (e) {
+          serializationErrorCount++;
+          if (serializationErrorSamples.length < 3) {
+            serializationErrorSamples.push(`Task "${task.name || 'unknown'}": ${e}`);
+          }
           return null;
         }
       }).filter(t => t !== null);
 
-      projectResults.push({
+      const projectResult = {
         projectId: project.id.primaryKey,
         projectName: project.name,
         taskCount: taskData.length,
         totalCount: totalCount,
         tasks: taskData
-      });
+      };
+      if (projectAccessError) {
+        projectResult.processingErrors = {
+          projectAccessError: projectAccessError,
+          filterErrors: 0,
+          serializationErrors: 0,
+          samples: []
+        };
+      } else if (filterErrorCount > 0 || serializationErrorCount > 0) {
+        projectResult.processingErrors = {
+          filterErrors: filterErrorCount,
+          serializationErrors: serializationErrorCount,
+          samples: filterErrorSamples.concat(serializationErrorSamples)
+        };
+      }
+      projectResults.push(projectResult);
     }
 
     return JSON.stringify({

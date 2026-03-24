@@ -157,6 +157,10 @@
         break;
     }
 
+    // Error tracking for filter evaluation
+    let filterErrorCount = 0;
+    const filterErrorSamples = [];
+
     // Apply all filters
     let filteredTasks = baseTasks.filter(task => {
       try {
@@ -333,6 +337,10 @@
 
         return true;
       } catch (error) {
+        filterErrorCount++;
+        if (filterErrorSamples.length < 3) {
+          filterErrorSamples.push(`Task "${task.name || 'unknown'}": ${error}`);
+        }
         return false;
       }
     });
@@ -371,7 +379,7 @@
 
     // countOnly mode - return just the count without task data
     if (filters.countOnly) {
-      return JSON.stringify({
+      const result = {
         count: totalMatchingCount,
         countOnly: true,
         filters: {
@@ -385,7 +393,14 @@
           flagged: filters.flagged,
           inInbox: filters.inInbox
         }
-      });
+      };
+      if (filterErrorCount > 0) {
+        result.processingErrors = {
+          filterErrors: filterErrorCount,
+          samples: filterErrorSamples
+        };
+      }
+      return JSON.stringify(result);
     }
 
     // Limit results
@@ -402,6 +417,10 @@
       sortedBy: filters.sortBy,
       sortOrder: filters.sortOrder
     };
+
+    // Error tracking for serialization
+    let serializationErrorCount = 0;
+    const serializationErrorSamples = [];
 
     // Process each task
     filteredTasks.forEach(task => {
@@ -431,9 +450,21 @@
 
         exportData.tasks.push(taskData);
       } catch (taskError) {
-        // Skip tasks with processing errors
+        serializationErrorCount++;
+        if (serializationErrorSamples.length < 3) {
+          serializationErrorSamples.push(`Task "${task.name || 'unknown'}": ${taskError}`);
+        }
       }
     });
+
+    // Attach processing errors if any occurred
+    if (filterErrorCount > 0 || serializationErrorCount > 0) {
+      exportData.processingErrors = {
+        filterErrors: filterErrorCount,
+        serializationErrors: serializationErrorCount,
+        samples: filterErrorSamples.concat(serializationErrorSamples)
+      };
+    }
 
     return JSON.stringify(exportData);
 

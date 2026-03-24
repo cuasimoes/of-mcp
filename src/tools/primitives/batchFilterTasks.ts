@@ -152,6 +152,16 @@ function formatBatchResults(data: any, options: BatchFilterTasksOptions): string
       }
       output += `\n\n`;
 
+      // Show processing errors for this project
+      if (projectResult.processingErrors) {
+        const pe = projectResult.processingErrors;
+        if (pe.projectAccessError) {
+          output += `⚠️ **Error**: ${pe.projectAccessError}\n\n`;
+        } else {
+          output += formatProcessingWarnings(pe);
+        }
+      }
+
       if (tasks.length === 0) {
         output += `_No matching tasks_\n\n`;
       } else {
@@ -172,6 +182,28 @@ function formatBatchResults(data: any, options: BatchFilterTasksOptions): string
     }
   }
 
+  return output;
+}
+
+// Format processing error warnings for display
+function formatProcessingWarnings(processingErrors: any): string {
+  if (!processingErrors) return '';
+  const filterErrors = processingErrors.filterErrors || 0;
+  const serializationErrors = processingErrors.serializationErrors || 0;
+  const totalErrors = filterErrors + serializationErrors;
+  if (totalErrors === 0) return '';
+
+  let output = `⚠️ **Processing Warnings**:\n`;
+  if (filterErrors > 0) {
+    output += `- ${filterErrors} task${filterErrors === 1 ? '' : 's'} excluded due to filter evaluation errors\n`;
+  }
+  if (serializationErrors > 0) {
+    output += `- ${serializationErrors} task${serializationErrors === 1 ? '' : 's'} excluded due to serialization errors\n`;
+  }
+  if (processingErrors.samples && processingErrors.samples.length > 0) {
+    output += `- Samples: ${processingErrors.samples.join('; ')}\n`;
+  }
+  output += '\n';
   return output;
 }
 

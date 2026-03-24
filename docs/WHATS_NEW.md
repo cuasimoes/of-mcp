@@ -1,6 +1,20 @@
-# OmniFocus MCP Server - What's New (v1.30.6)
+# OmniFocus MCP Server - What's New (v1.30.7)
 
 > Summary of changes from Sprints 1-10 for AI assistants using this MCP server.
+
+## v1.30.7 Surface processing errors in filter operations (Issue #109)
+
+**Bug fix for silent error swallowing in `filter_tasks` and `batch_filter_tasks`:**
+- Added `filterErrorCount`/`filterErrorSamples` tracking in `filterTasks.js` filter catch block — errors are now counted and sampled instead of silently returning `false`
+- Added `serializationErrorCount`/`serializationErrorSamples` tracking in `filterTasks.js` serialization catch block — tasks dropped during serialization are now tracked
+- `countOnly` mode now includes `processingErrors` in its response when filter evaluation errors occur
+- Non-countOnly mode now includes `processingErrors` with both filter and serialization error counts
+- Added `formatProcessingWarnings()` helper in `filterTasks.ts` for consistent warning display across both code paths
+- `batch_filter_tasks`: All 3 catch blocks (filter, project access, serialization) now track errors per-project
+- `batchFilterTasks.ts` displays per-project processing warnings including project access failures
+- Previously, all processing errors were silently discarded, giving inaccurate counts/results with no warning
+
+---
 
 ## v1.30.6 Bring batch_filter_tasks to date filter parity (Issue #103)
 
