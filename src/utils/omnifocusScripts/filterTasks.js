@@ -339,7 +339,7 @@
       } catch (error) {
         filterErrorCount++;
         if (filterErrorSamples.length < 3) {
-          filterErrorSamples.push(`Task "${task.name || 'unknown'}": ${error}`);
+          filterErrorSamples.push(`Task "${task.name || 'unknown'}": ${error.message || String(error)}`);
         }
         return false;
       }
@@ -397,6 +397,7 @@
       if (filterErrorCount > 0) {
         result.processingErrors = {
           filterErrors: filterErrorCount,
+          serializationErrors: 0,
           samples: filterErrorSamples
         };
       }
@@ -452,7 +453,7 @@
       } catch (taskError) {
         serializationErrorCount++;
         if (serializationErrorSamples.length < 3) {
-          serializationErrorSamples.push(`Task "${task.name || 'unknown'}": ${taskError}`);
+          serializationErrorSamples.push(`Task "${task.name || 'unknown'}": ${taskError.message || String(taskError)}`);
         }
       }
     });

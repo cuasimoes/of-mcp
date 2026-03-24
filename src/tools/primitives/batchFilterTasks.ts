@@ -1,6 +1,7 @@
 import { executeOmniFocusScript } from '../../utils/scriptExecution.js';
 import { logger } from '../../utils/logger.js';
 import { formatDateSafe } from '../../utils/dateUtils.js';
+import { formatProcessingWarnings } from '../../utils/formatUtils.js';
 
 const log = logger.child('batchFilterTasks');
 
@@ -79,6 +80,18 @@ export async function batchFilterTasks(options: BatchFilterTasksOptions = {}): P
 
       if (data.error) {
         throw new Error(data.error);
+      }
+
+      // Log processing errors from any project
+      if (data.projectResults) {
+        for (const pr of data.projectResults) {
+          if (pr.processingErrors) {
+            log.warn('Batch filter returned processing errors', {
+              project: pr.projectName,
+              ...pr.processingErrors
+            });
+          }
+        }
       }
 
       return formatBatchResults(data, options);
@@ -182,28 +195,6 @@ function formatBatchResults(data: any, options: BatchFilterTasksOptions): string
     }
   }
 
-  return output;
-}
-
-// Format processing error warnings for display
-function formatProcessingWarnings(processingErrors: any): string {
-  if (!processingErrors) return '';
-  const filterErrors = processingErrors.filterErrors || 0;
-  const serializationErrors = processingErrors.serializationErrors || 0;
-  const totalErrors = filterErrors + serializationErrors;
-  if (totalErrors === 0) return '';
-
-  let output = `⚠️ **Processing Warnings**:\n`;
-  if (filterErrors > 0) {
-    output += `- ${filterErrors} task${filterErrors === 1 ? '' : 's'} excluded due to filter evaluation errors\n`;
-  }
-  if (serializationErrors > 0) {
-    output += `- ${serializationErrors} task${serializationErrors === 1 ? '' : 's'} excluded due to serialization errors\n`;
-  }
-  if (processingErrors.samples && processingErrors.samples.length > 0) {
-    output += `- Samples: ${processingErrors.samples.join('; ')}\n`;
-  }
-  output += '\n';
   return output;
 }
 

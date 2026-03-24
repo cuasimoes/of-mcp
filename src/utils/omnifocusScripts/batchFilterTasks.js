@@ -282,13 +282,13 @@
           } catch (e) {
             filterErrorCount++;
             if (filterErrorSamples.length < 3) {
-              filterErrorSamples.push(`Task "${task.name || 'unknown'}": ${e}`);
+              filterErrorSamples.push(`Task "${task.name || 'unknown'}": ${e.message || String(e)}`);
             }
             return false;
           }
         });
       } catch (e) {
-        projectAccessError = `Error accessing project tasks: ${e}`;
+        projectAccessError = `Error accessing project tasks: ${e.message || String(e)}`;
       }
 
       // Sort tasks
@@ -365,7 +365,7 @@
         } catch (e) {
           serializationErrorCount++;
           if (serializationErrorSamples.length < 3) {
-            serializationErrorSamples.push(`Task "${task.name || 'unknown'}": ${e}`);
+            serializationErrorSamples.push(`Task "${task.name || 'unknown'}": ${e.message || String(e)}`);
           }
           return null;
         }
@@ -374,8 +374,8 @@
       const projectResult = {
         projectId: project.id.primaryKey,
         projectName: project.name,
-        taskCount: taskData.length,
-        totalCount: totalCount,
+        taskCount: projectAccessError ? null : taskData.length,
+        totalCount: projectAccessError ? null : totalCount,
         tasks: taskData
       };
       if (projectAccessError) {
