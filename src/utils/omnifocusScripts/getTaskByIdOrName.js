@@ -59,6 +59,17 @@
       createdDate: foundTask.added ? foundTask.added.toISOString() : null,
       hasChildren: foundTask.hasChildren,
       childrenCount: foundTask.children ? foundTask.children.length : 0,
+      children: foundTask.children ? foundTask.children.map(child => ({
+        id: child.id.primaryKey,
+        name: child.name,
+        completed: child.taskStatus === Task.Status.Completed,
+        dropped: child.taskStatus === Task.Status.Dropped,
+        flagged: child.flagged,
+        dueDate: child.dueDate ? child.dueDate.toISOString() : null,
+        deferDate: child.deferDate ? child.deferDate.toISOString() : null,
+        hasChildren: child.hasChildren,
+        childrenCount: child.children ? child.children.length : 0
+      })) : [],
       parentId: null,
       parentName: null,
       projectId: null,
