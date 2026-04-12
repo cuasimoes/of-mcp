@@ -57,8 +57,9 @@
       plannedDate: foundTask.plannedDate ? foundTask.plannedDate.toISOString() : null,
       estimatedMinutes: foundTask.estimatedMinutes || null,
       createdDate: foundTask.added ? foundTask.added.toISOString() : null,
-      hasChildren: foundTask.hasChildren,
-      childrenCount: foundTask.children ? foundTask.children.length : 0,
+      children: [],
+      hasChildren: false,
+      childrenCount: 0,
       parentId: null,
       parentName: null,
       projectId: null,
@@ -67,6 +68,27 @@
       repetitionRule: foundTask.repetitionRule ? foundTask.repetitionRule.toString() : null,
       isRepeating: foundTask.repetitionRule !== null
     };
+
+    // Build children list — derived so hasChildren/childrenCount stay consistent
+    try {
+      if (foundTask.children && foundTask.children.length > 0) {
+        taskInfo.children = foundTask.children.map(child => ({
+          id: child.id.primaryKey,
+          name: child.name,
+          completed: child.taskStatus === Task.Status.Completed,
+          dropped: child.taskStatus === Task.Status.Dropped,
+          flagged: child.flagged,
+          dueDate: child.dueDate ? child.dueDate.toISOString() : null,
+          deferDate: child.deferDate ? child.deferDate.toISOString() : null,
+          hasChildren: child.hasChildren,
+          childrenCount: child.children ? child.children.length : 0
+        }));
+      }
+    } catch (e) {
+      taskInfo.childrenError = `Could not load subtasks: ${e}`;
+    }
+    taskInfo.hasChildren = taskInfo.children.length > 0;
+    taskInfo.childrenCount = taskInfo.children.length;
 
     // Get parent info
     try {
