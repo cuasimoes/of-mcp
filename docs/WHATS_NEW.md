@@ -1,6 +1,18 @@
-# OmniFocus MCP Server - What's New (v1.30.8)
+# OmniFocus MCP Server - What's New (v1.31.0)
 
 > Summary of changes from Sprints 1-10 for AI assistants using this MCP server.
+
+## v1.31.0 Expose subtasks in get_task_by_id response
+
+**`get_task_by_id` now returns a `children` array** containing one level of direct subtasks for any task that has them. Each child entry includes: `id`, `name`, `completed`, `dropped`, `flagged`, `dueDate`, `deferDate`, `hasChildren`, and `childrenCount`. The parent response also includes `hasChildren` and `childrenCount` fields so you can detect deep hierarchies without fetching children.
+
+**Display:** The tool output now shows subtasks with status icons (✅ completed, 🗑️ dropped, ⚪ active) and flags nesting depth with `(+N more)` when a child itself has children.
+
+**Depth cap:** Only direct children are returned. Grandchildren are not enumerated — use `get_task_by_id` on a child's ID to traverse further.
+
+**Robustness:** If children can't be loaded (e.g. during an OmniFocus sync), `children` defaults to `[]` and a `childrenError` field is set with the reason. `hasChildren` and `childrenCount` are always derived from the successfully-built children list, so they stay consistent.
+
+---
 
 ## v1.30.8 Fix add_project folderName case sensitivity (Issue #112)
 
