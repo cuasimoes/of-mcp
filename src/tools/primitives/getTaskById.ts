@@ -24,6 +24,17 @@ export interface TaskInfo {
   projectName?: string;
   hasChildren: boolean;
   childrenCount: number;
+  children: Array<{
+    id: string;
+    name: string;
+    completed: boolean;
+    dropped: boolean;
+    flagged: boolean;
+    dueDate?: string | null;
+    deferDate?: string | null;
+    hasChildren: boolean;
+    childrenCount: number;
+  }>;
   createdDate?: string | null;
   repetitionRule?: string | null; // iCal RRULE string representation
   isRepeating?: boolean;
