@@ -73,6 +73,8 @@ function formatDate(date) {
  * @returns {string} - Full path with " > " separators
  */
 function getFolderPath(folder) {
+  // In OmniJS, folder.parent is falsy for root-level folders (verified via
+  // osascript testing), so the loop naturally stops without hitting Database.
   const parts = [];
   let current = folder;
   while (current) {

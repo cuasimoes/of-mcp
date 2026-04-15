@@ -144,6 +144,24 @@ add_project {
 }
 ```
 
+#### Folder Path Disambiguation
+
+When folders share the same name at different levels (e.g., both `Personal > Areas` and `Work > Areas`), use the full path with ` > ` separators to disambiguate:
+
+```bash
+# Disambiguate folders with the same name
+get_folder_by_id { "folderName": "Work > Areas" }
+get_folder_by_id { "folderName": "Personal > Areas" }
+
+# Filter projects by disambiguated folder
+list_projects { "folderName": "Work > Areas" }
+
+# Plain names still work (first match, backwards compatible)
+get_folder_by_id { "folderName": "Areas" }
+```
+
+Path syntax is supported everywhere a `folderName` parameter is accepted: `add_project`, `add_folder`, `edit_item`, `duplicate_project`, `batch_add_items`, `batch_edit_items`, `list_projects`, and `get_folder_by_id`.
+
 ### 3. 🔍 Perspective Views
 
 Access all major OmniFocus perspectives:
