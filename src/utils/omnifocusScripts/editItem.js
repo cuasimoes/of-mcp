@@ -61,8 +61,7 @@
     const tagsByName = new Map();
     flattenedTags.forEach(t => tagsByName.set(t.name.toLowerCase(), t));
 
-    const foldersByName = new Map();
-    flattenedFolders.forEach(f => foldersByName.set(f.name.toLowerCase(), f));
+    const allFolders = flattenedFolders;
 
     // Find the item using Maps
     let foundItem = null;
@@ -314,15 +313,17 @@
 
       // Try ID first
       if (args.newFolderId) {
-        // Build folder ID map if not already done
-        const foldersById = new Map();
-        flattenedFolders.forEach(f => foldersById.set(f.id.primaryKey, f));
-        targetFolder = foldersById.get(args.newFolderId);
+        for (const f of allFolders) {
+          if (f.id.primaryKey === args.newFolderId) {
+            targetFolder = f;
+            break;
+          }
+        }
       }
 
-      // Fall back to name if ID not found or not provided
+      // Fall back to name (supports "Parent > Child" paths)
       if (!targetFolder && args.newFolderName) {
-        targetFolder = foldersByName.get(args.newFolderName.toLowerCase());
+        targetFolder = resolveFolderByName(args.newFolderName, allFolders);
       }
 
       if (targetFolder) {

@@ -26,15 +26,9 @@
       }
     }
 
-    // If not found by ID, search by name (case-insensitive)
+    // If not found by ID, search by name (supports "Parent > Child" paths)
     if (!foundFolder && folderName) {
-      const folderNameLower = folderName.toLowerCase();
-      for (const folder of allFolders) {
-        if (folder.name.toLowerCase() === folderNameLower) {
-          foundFolder = folder;
-          break;
-        }
-      }
+      foundFolder = resolveFolderByName(folderName, allFolders);
     }
 
     if (!foundFolder) {
@@ -83,7 +77,7 @@
       // Subfolder count not accessible
     }
 
-    // Get parent folder info
+    // Get parent folder info and full path
     try {
       if (foundFolder.parent && foundFolder.parent.folder) {
         folderInfo.parentFolderId = foundFolder.parent.id.primaryKey;
@@ -91,6 +85,12 @@
       }
     } catch (e) {
       // Parent folder not accessible
+    }
+
+    try {
+      folderInfo.path = getFolderPath(foundFolder);
+    } catch (e) {
+      folderInfo.path = foundFolder.name;
     }
 
     return JSON.stringify({

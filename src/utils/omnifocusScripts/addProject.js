@@ -51,15 +51,9 @@
         }
       }
 
-      // Fall back to name lookup if ID not found or not provided
+      // Fall back to name lookup (supports "Parent > Child" paths)
       if (!container && folderName) {
-        const folderNameLower = folderName.toLowerCase();
-        for (const folder of allFolders) {
-          if (folder.name.toLowerCase() === folderNameLower) {
-            container = folder;
-            break;
-          }
-        }
+        container = resolveFolderByName(folderName, allFolders);
       }
 
       if (!container) {

@@ -55,8 +55,12 @@
       if (folderId && projectFolder.id.primaryKey === folderId) {
         return true;
       }
-      if (folderName && projectFolder.name.toLowerCase() === folderName.toLowerCase()) {
-        return true;
+      if (folderName) {
+        // Support path-style matching: compare against full path
+        const resolved = resolveFolderByName(folderName, flattenedFolders);
+        if (resolved && resolved.id.primaryKey === projectFolder.id.primaryKey) {
+          return true;
+        }
       }
       return false;
     }
@@ -111,13 +115,13 @@
         }
       } catch (e) {}
 
-      // Get folder info
+      // Get folder info (full path via getFolderPath from sharedUtils)
       let projectFolderId = null;
       let projectFolderName = null;
       try {
         if (project.parentFolder) {
           projectFolderId = project.parentFolder.id.primaryKey;
-          projectFolderName = project.parentFolder.name;
+          projectFolderName = getFolderPath(project.parentFolder);
         }
       } catch (e) {}
 
