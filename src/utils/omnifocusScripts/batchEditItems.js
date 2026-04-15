@@ -88,10 +88,9 @@
       return tagsByName;
     }
 
-    function getFoldersByName() {
+    function getAllFolders() {
       if (!foldersByName) {
-        foldersByName = new Map();
-        flattenedFolders.forEach(f => foldersByName.set(f.name.toLowerCase(), f));
+        foldersByName = flattenedFolders;
       }
       return foldersByName;
     }
@@ -354,9 +353,9 @@
             targetFolder = getFoldersById().get(edit.newFolderId);
           }
 
-          // Fall back to name if ID not found or not provided
+          // Fall back to name (supports "Parent > Child" paths)
           if (!targetFolder && edit.newFolderName) {
-            targetFolder = getFoldersByName().get(edit.newFolderName.toLowerCase());
+            targetFolder = resolveFolderByName(edit.newFolderName, getAllFolders());
           }
 
           if (targetFolder) {
