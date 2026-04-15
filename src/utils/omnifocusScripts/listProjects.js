@@ -41,9 +41,15 @@
       return statusMap[project.status] || "Unknown";
     }
 
+    // Resolve folder filter once (not per-project)
+    const resolvedFilterFolder = folderName
+      ? resolveFolderByName(folderName, flattenedFolders)
+      : null;
+    const filterFolderId = folderId || (resolvedFilterFolder ? resolvedFilterFolder.id.primaryKey : null);
+
     // Helper to check if project matches folder filter
     function matchesFolder(project) {
-      if (!folderName && !folderId) {
+      if (!filterFolderId) {
         return true; // No folder filter
       }
 
@@ -52,17 +58,7 @@
         return false; // Project has no folder, but filter requires one
       }
 
-      if (folderId && projectFolder.id.primaryKey === folderId) {
-        return true;
-      }
-      if (folderName) {
-        // Support path-style matching: compare against full path
-        const resolved = resolveFolderByName(folderName, flattenedFolders);
-        if (resolved && resolved.id.primaryKey === projectFolder.id.primaryKey) {
-          return true;
-        }
-      }
-      return false;
+      return projectFolder.id.primaryKey === filterFolderId;
     }
 
     // Helper to check if project matches status filter

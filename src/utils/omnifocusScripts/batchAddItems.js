@@ -19,7 +19,7 @@
     let tasksByName = null;
     let tasksById = null;
     let tagsByName = null;
-    let foldersByName = null;
+    let cachedFolders = null;
     let foldersById = null;
 
     function getProjectsByName() {
@@ -67,10 +67,10 @@
     }
 
     function getAllFolders() {
-      if (!foldersByName) {
-        foldersByName = flattenedFolders;
+      if (!cachedFolders) {
+        cachedFolders = flattenedFolders;
       }
-      return foldersByName;
+      return cachedFolders;
     }
 
     function getFoldersById() {
