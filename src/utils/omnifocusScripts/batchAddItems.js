@@ -66,10 +66,9 @@
       return tagsByName;
     }
 
-    function getFoldersByName() {
+    function getAllFolders() {
       if (!foldersByName) {
-        foldersByName = new Map();
-        flattenedFolders.forEach(f => foldersByName.set(f.name.toLowerCase(), f));
+        foldersByName = flattenedFolders;
       }
       return foldersByName;
     }
@@ -275,7 +274,7 @@
               container = getFoldersById().get(folderId);
             }
             if (!container && folderName) {
-              container = getFoldersByName().get(folderName.toLowerCase());
+              container = resolveFolderByName(folderName, getAllFolders());
             }
             if (!container) {
               const searchRef = folderId ? `ID "${folderId}"` : `name "${folderName}"`;

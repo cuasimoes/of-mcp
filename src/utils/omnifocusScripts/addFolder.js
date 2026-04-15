@@ -35,12 +35,7 @@
           });
         }
       } else if (parentFolderName) {
-        for (const folder of allFolders) {
-          if (folder.name === parentFolderName) {
-            parentFolder = folder;
-            break;
-          }
-        }
+        parentFolder = resolveFolderByName(parentFolderName, allFolders);
         if (!parentFolder) {
           return JSON.stringify({
             success: false,
