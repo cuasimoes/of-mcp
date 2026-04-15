@@ -67,6 +67,63 @@ function formatDate(date) {
 }
 
 /**
+ * Build the full ancestor path for a folder (e.g. "Work > Projects > Active").
+ * Walks up the parent chain. Returns the folder's own name if it has no parent.
+ * @param {Folder} folder - An OmniFocus Folder object
+ * @returns {string} - Full path with " > " separators
+ */
+function getFolderPath(folder) {
+  // In OmniJS, folder.parent is falsy for root-level folders (verified via
+  // osascript testing), so the loop naturally stops without hitting Database.
+  const parts = [];
+  let current = folder;
+  while (current) {
+    parts.unshift(current.name);
+    current = current.parent || null;
+  }
+  return parts.join(' > ');
+}
+
+/**
+ * Resolve a folder by name, supporting path-style disambiguation.
+ * Accepts plain names ("Projects") or paths ("Work > Projects").
+ * Plain names match any folder (first match). Paths match the full ancestor chain.
+ * Case-insensitive comparison.
+ * @param {string} folderName - Folder name or " > "-separated path
+ * @param {Array} allFolders - flattenedFolders array
+ * @returns {Folder|null} - Matched folder or null
+ */
+function resolveFolderByName(folderName, allFolders) {
+  const nameLower = folderName.toLowerCase();
+  const isPath = nameLower.indexOf(' > ') !== -1;
+
+  if (isPath) {
+    const pathLower = nameLower.split(' > ').map(function(s) { return s.trim(); });
+    const leafName = pathLower[pathLower.length - 1];
+    for (const folder of allFolders) {
+      if (folder.name.toLowerCase() !== leafName) continue;
+      // Walk up the parent chain and compare each segment
+      const actualPath = getFolderPath(folder).toLowerCase().split(' > ');
+      if (actualPath.length !== pathLower.length) continue;
+      let match = true;
+      for (let i = 0; i < pathLower.length; i++) {
+        if (actualPath[i] !== pathLower[i]) { match = false; break; }
+      }
+      if (match) return folder;
+    }
+    return null;
+  }
+
+  // Plain name: first case-insensitive match (existing behavior)
+  for (const folder of allFolders) {
+    if (folder.name.toLowerCase() === nameLower) {
+      return folder;
+    }
+  }
+  return null;
+}
+
+/**
  * Map of OmniFocus Task.Status enum values to human-readable strings.
  * Used for serializing task status in JSON responses.
  */

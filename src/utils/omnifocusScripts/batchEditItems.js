@@ -41,7 +41,7 @@
     let tasksByName = null;
     let tasksById = null;
     let tagsByName = null;
-    let foldersByName = null;
+    let cachedFolders = null;
     let foldersById = null;
 
     function getProjectsByName() {
@@ -88,12 +88,11 @@
       return tagsByName;
     }
 
-    function getFoldersByName() {
-      if (!foldersByName) {
-        foldersByName = new Map();
-        flattenedFolders.forEach(f => foldersByName.set(f.name.toLowerCase(), f));
+    function getAllFolders() {
+      if (!cachedFolders) {
+        cachedFolders = flattenedFolders;
       }
-      return foldersByName;
+      return cachedFolders;
     }
 
     function getFoldersById() {
@@ -354,9 +353,9 @@
             targetFolder = getFoldersById().get(edit.newFolderId);
           }
 
-          // Fall back to name if ID not found or not provided
+          // Fall back to name (supports "Parent > Child" paths)
           if (!targetFolder && edit.newFolderName) {
-            targetFolder = getFoldersByName().get(edit.newFolderName.toLowerCase());
+            targetFolder = resolveFolderByName(edit.newFolderName, getAllFolders());
           }
 
           if (targetFolder) {
