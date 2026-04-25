@@ -1,6 +1,30 @@
-# OmniFocus MCP Server - What's New (v1.30.7)
+# OmniFocus MCP Server - What's New (v1.31.0)
 
 > Summary of changes from Sprints 1-10 for AI assistants using this MCP server.
+
+## v1.31.0 Folder path disambiguation and server version fix (Issues #1, #2, #3)
+
+**Folder path disambiguation:**
+- All tools accepting `folderName` now support `"Parent > Child"` path syntax to disambiguate folders with the same name at different hierarchy levels (e.g., `"Work > Areas"` vs `"Personal > Areas"`)
+- Plain folder names still work (first match, backwards compatible)
+- Affected tools: `get_folder_by_id`, `add_project`, `add_folder`, `edit_item`, `duplicate_project`, `batch_add_items`, `batch_edit_items`, `list_projects`
+
+**Full folder paths in output:**
+- `list_projects` now returns full folder paths (e.g., `"Work > Areas"`) instead of bare names (`"Areas"`)
+- `get_folder_by_id` now includes a `path` field in its response
+
+**Server version fix:**
+- `get_server_version` no longer fails with ENOENT when the MCP server runs from a directory without a `package.json`
+
+---
+
+## v1.30.8 Fix add_project folderName case sensitivity (Issue #112)
+
+**`add_project` folder name lookup is now case-insensitive.** Previously `add_project` required an exact-case match on `folderName`, while `batch_add_items` and `edit_item` already matched case-insensitively. All three tools now behave consistently — e.g. `folderName: "work projects"` resolves to an existing `Work Projects` folder.
+
+**Note on issue #112 scope.** The issue also reported two other defects: (1) `batch_add_items` with `folderName` + `sequential: true` flipping projects to Dropped; (2) `edit_item` / `batch_edit_items` with `newProjectStatus: "active"` failing to recover Dropped projects. Neither could be reproduced in diagnostic testing against v1.30.7 across multiple variants (including a sequential project with child tasks, and drop-then-recover via both `edit_item` and `batch_edit_items`). The cited source code is unchanged; applying speculative fixes without a reproducer was deliberately avoided. Those reports remain open on #112 pending fresh steps-to-reproduce.
+
+---
 
 ## v1.30.7 Surface silent catch block errors in filter operations (Issues #104, #109)
 

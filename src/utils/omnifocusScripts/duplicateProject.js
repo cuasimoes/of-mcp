@@ -43,8 +43,7 @@
       }
     }
     if (!targetFolder && folderName) {
-      const nameLower = folderName.toLowerCase();
-      targetFolder = flattenedFolders.find(f => f.name.toLowerCase() === nameLower);
+      targetFolder = resolveFolderByName(folderName, flattenedFolders);
       if (!targetFolder) {
         return JSON.stringify({
           success: false,
