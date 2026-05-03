@@ -75,13 +75,18 @@ function formatDate(date) {
 function getFolderPath(folder) {
   // In OmniJS, folder.parent is falsy for root-level folders (verified via
   // osascript testing), so the loop naturally stops without hitting Database.
-  const parts = [];
-  let current = folder;
-  while (current) {
-    parts.unshift(current.name);
-    current = current.parent || null;
+  try {
+    const parts = [];
+    let current = folder;
+    while (current) {
+      parts.unshift(current.name);
+      current = current.parent || null;
+    }
+    return parts.join(' > ');
+  } catch (e) {
+    // Fall back to bare name if the parent chain is inaccessible (e.g. during sync)
+    return folder.name;
   }
-  return parts.join(' > ');
 }
 
 /**
