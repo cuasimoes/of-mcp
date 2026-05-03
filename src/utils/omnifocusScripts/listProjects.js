@@ -47,7 +47,9 @@
       : null;
     const filterFolderId = folderId || (resolvedFilterFolder ? resolvedFilterFolder.id.primaryKey : null);
 
-    // Helper to check if project matches folder filter
+    // Helper to check if project matches folder filter.
+    // Intentionally shallow: only matches direct parent, not nested subfolders.
+    // Filtering by "Work" will not include projects in "Work > Subteam".
     function matchesFolder(project) {
       if (!filterFolderId) {
         return true; // No folder filter
