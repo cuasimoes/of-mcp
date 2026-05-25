@@ -1,6 +1,21 @@
-# OmniFocus MCP Server - What's New (v1.30.8)
+# OmniFocus MCP Server - What's New (v1.30.9)
 
 > Summary of changes from Sprints 1-10 for AI assistants using this MCP server.
+
+## v1.30.9 Remove dead dump_database code (Issue #110)
+
+**Removed orphaned remnants of the old `dump_database` feature.** The `dump_database` tool itself was removed long ago, but three files were left behind as dead code that nothing referenced:
+- `src/utils/omnifocusScripts/omnifocusDump.js` — the OmniJS export script (no tool executed it)
+- `src/types.ts` — the dump's data-model interfaces (`OmnifocusTask`, `OmnifocusDatabase`, etc.; zero imports, not a published type surface)
+- `src/omnifocustypes.ts` — unused `Minimal` types
+
+Also corrected a stale hint in the `list_projects` tool description that referenced the non-existent `dump_database` tool.
+
+**Impact:** None for users — no tool behavior changes. This is pure dead-code removal.
+
+**Relation to issue #110.** #110 catalogues silent `catch` blocks across OmniJS scripts. The `omnifocusDump.js` cases it lists were in this dead script, so they are resolved by deletion rather than by adding error reporting. The remaining live scripts named in #110 (`listProjects.js`, `getProjectsForReview.js`, `getProjectByName.js`, `getFolderByName.js`, `getTaskByIdOrName.js`, `editItem.js`) are tracked as follow-up work.
+
+---
 
 ## v1.30.8 Fix add_project folderName case sensitivity (Issue #112)
 

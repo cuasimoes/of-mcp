@@ -43,11 +43,6 @@ This is an enhanced Model Context Protocol (MCP) server that provides AI assista
 
 ### Key Components
 
-**Data Types** (`src/types.ts`):
-- `OmnifocusTask` - Complete task structure with hierarchical relationships
-- `OmnifocusProject`, `OmnifocusFolder`, `OmnifocusTag` - Supporting entities
-- `OmnifocusDatabase` - Full database export structure
-
 **Perspective Engine** (`src/utils/perspectiveEngine.ts`):
 - Advanced filtering system beyond native OmniFocus capabilities
 - Supports complex queries combining status, dates, estimates, tags, and projects
