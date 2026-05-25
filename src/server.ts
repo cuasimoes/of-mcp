@@ -226,7 +226,7 @@ server.tool(
 // Project listing tool
 server.tool(
   "list_projects",
-  "List projects with optional folder and status filtering - use this instead of dump_database for project discovery",
+  "List projects with optional folder and status filtering - the efficient way to discover projects without exporting the entire database",
   listProjectsTool.schema.shape,
   listProjectsTool.handler
 );
