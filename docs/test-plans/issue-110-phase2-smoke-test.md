@@ -183,14 +183,16 @@ expected, correct result.
 
 | Test | Result | Notes |
 |------|--------|-------|
-| TC1 Version gate | ☐ PASS ☐ FAIL | |
-| TC2 list_projects happy path | ☐ PASS ☐ FAIL | |
-| TC3 list_projects filters | ☐ PASS ☐ FAIL | |
-| TC4 get_projects_for_review happy path | ☐ PASS ☐ FAIL | |
-| TC5 get_projects_for_review on-hold | ☐ PASS ☐ FAIL | |
-| TC6 warning path (optional) | ☐ n/a ☐ triggered | |
+| TC1 Version gate | ☑ PASS ☐ FAIL | `get_server_version` returned `1.30.10` |
+| TC2 list_projects happy path | ☑ PASS ☐ FAIL | Table + Project IDs + "Found **60** active projects:"; no warning section |
+| TC3 list_projects filters | ☑ PASS ☐ FAIL | `status:all` → 100, `folderName:<a folder>` → 12 (correctly scoped), `status:onHold` → 35; no warnings |
+| TC4 get_projects_for_review happy path | ☑ PASS ☐ FAIL | "(50 of 59)"; foldered projects now show `• Folder:` (cross-checked vs `list_projects`); a root-level project shows none; no warning section |
+| TC5 get_projects_for_review on-hold | ☑ PASS ☐ FAIL | "(50 of 94)"; on-hold projects included and showing folders (cross-checked vs `list_projects`); no warning section |
+| TC6 warning path (optional) | ☑ n/a ☐ triggered | No `⚠️ Processing Warnings` anywhere in TC2-TC5 (expected on a healthy DB) |
 
-**Overall:** ☐ PASS (TC1–TC5 all pass) ☐ FAIL
+**Overall:** ☑ PASS (TC1–TC5 all pass) ☐ FAIL
+
+**Run:** 2026-05-25 by Claude (Opus 4.7) in a Claude Code session, against the uncommitted working-tree build (v1.30.10), live OmniFocus database. Note: the issue #110 changes were still unstaged at time of test.
 
 ---
 
