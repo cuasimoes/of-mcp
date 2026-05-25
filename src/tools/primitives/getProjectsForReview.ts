@@ -22,6 +22,11 @@ export interface ProjectForReview {
   lastReviewDate: string | null; // ISO date
 }
 
+export interface ProcessingErrors {
+  metadataErrors: number;
+  samples: string[];
+}
+
 /**
  * Get projects that need review from OmniFocus
  */
@@ -30,6 +35,7 @@ export async function getProjectsForReview(params: GetProjectsForReviewParams): 
   totalCount?: number;
   returnedCount?: number;
   projects?: ProjectForReview[];
+  processingErrors?: ProcessingErrors;
   error?: string;
 }> {
   try {
@@ -61,11 +67,15 @@ export async function getProjectsForReview(params: GetProjectsForReviewParams): 
     }
 
     if (parsed.success) {
+      if (parsed.processingErrors) {
+        log.warn('getProjectsForReview returned processing errors', parsed.processingErrors);
+      }
       return {
         success: true,
         totalCount: parsed.totalCount,
         returnedCount: parsed.returnedCount,
-        projects: parsed.projects as ProjectForReview[]
+        projects: parsed.projects as ProjectForReview[],
+        processingErrors: parsed.processingErrors
       };
     } else {
       return {

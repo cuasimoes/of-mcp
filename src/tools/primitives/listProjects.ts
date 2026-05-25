@@ -21,12 +21,18 @@ interface ProjectInfo {
   nextReviewDate: string | null;
 }
 
+interface ProcessingErrors {
+  metadataErrors: number;
+  samples: string[];
+}
+
 interface ListProjectsResult {
   success: boolean;
   count: number;
   folderFilter: string | null;
   statusFilter: string;
   projects: ProjectInfo[];
+  processingErrors?: ProcessingErrors;
   error?: string;
 }
 
@@ -73,6 +79,10 @@ export async function listProjects(options: ListProjectsOptions = {}): Promise<L
       }
     } else {
       parsed = result as ListProjectsResult;
+    }
+
+    if (parsed.processingErrors) {
+      log.warn('listProjects returned processing errors', parsed.processingErrors);
     }
 
     return parsed;
