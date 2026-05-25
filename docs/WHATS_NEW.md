@@ -1,6 +1,18 @@
-# OmniFocus MCP Server - What's New (v1.30.9)
+# OmniFocus MCP Server - What's New (v1.30.10)
 
 > Summary of changes from Sprints 1-10 for AI assistants using this MCP server.
+
+## v1.30.10 Surface metadata read errors in project listing tools (Issue #110, Phase 2)
+
+**`list_projects` and `get_projects_for_review` no longer silently swallow optional-field read errors.** Previously, if a project's task count, folder info, or review date/interval couldn't be read, the `catch` block discarded the error and the field silently fell back to `0`/`null` — so a partial result was indistinguishable from a complete one. These tools now count such failures and append a **⚠️ Processing Warnings** section (e.g. "2 details could not be read; affected fields may show as '-', 0, or null") with up to 3 sample messages, and emit a server-side `log.warn`.
+
+**Impact:** Error-free calls produce identical output to before — the warning only appears when a field actually failed to read. The projects themselves are still listed; this only adds visibility into incomplete data.
+
+**Also fixed (`get_projects_for_review`):** each project now correctly shows its **folder**. The script was reading a non-existent `project.folder` property (always `undefined`) instead of `project.parentFolder`, so the folder line was silently always blank. This was a wrong-property bug, not a swallowed exception, so it was invisible to the error-surfacing above — found during Phase 2 testing. `list_projects` was never affected (it already used `parentFolder`).
+
+**Pattern.** This reuses the `processingErrors` mechanism from v1.30.7 (issue #104/#109), generalized with a new `metadataErrors` category in `formatProcessingWarnings()`. The `processingErrors: { metadataErrors, samples }` contract is the template for the remaining #110 phases (`getProjectByName.js`, `getFolderByName.js`, `getTaskByIdOrName.js`, `editItem.js`). Defensive folder-traversal guards that return a safe default (`isInDroppedFolder`/`isEffectivelyDropped`) are intentionally left uncounted.
+
+---
 
 ## v1.30.9 Remove dead dump_database code (Issue #110)
 
