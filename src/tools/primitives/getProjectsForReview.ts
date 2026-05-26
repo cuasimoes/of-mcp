@@ -1,5 +1,6 @@
 import { executeOmniFocusScript } from '../../utils/scriptExecution.js';
 import { logger } from '../../utils/logger.js';
+import { ProcessingErrors } from '../../utils/formatUtils.js';
 
 const log = logger.child('getProjectsForReview');
 
@@ -20,11 +21,6 @@ export interface ProjectForReview {
   reviewInterval: number | null; // seconds between reviews
   nextReviewDate: string | null; // ISO date
   lastReviewDate: string | null; // ISO date
-}
-
-export interface ProcessingErrors {
-  metadataErrors: number;
-  samples: string[];
 }
 
 /**

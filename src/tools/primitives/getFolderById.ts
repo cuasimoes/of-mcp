@@ -1,5 +1,6 @@
 import { executeOmniFocusScript } from '../../utils/scriptExecution.js';
 import { logger } from '../../utils/logger.js';
+import { ProcessingErrors } from '../../utils/formatUtils.js';
 
 const log = logger.child('getFolderById');
 
@@ -24,7 +25,7 @@ export interface FolderInfo {
 /**
  * Get folder information by ID or name from OmniFocus
  */
-export async function getFolderById(params: GetFolderByIdParams): Promise<{success: boolean, folder?: FolderInfo, error?: string}> {
+export async function getFolderById(params: GetFolderByIdParams): Promise<{success: boolean, folder?: FolderInfo, processingErrors?: ProcessingErrors, error?: string}> {
   try {
     // Validate parameters
     if (!params.folderId && !params.folderName) {
@@ -62,9 +63,13 @@ export async function getFolderById(params: GetFolderByIdParams): Promise<{succe
     }
 
     if (parsed.success) {
+      if (parsed.processingErrors) {
+        log.warn('getFolderById returned processing errors', parsed.processingErrors);
+      }
       return {
         success: true,
-        folder: parsed.folder as FolderInfo
+        folder: parsed.folder as FolderInfo,
+        processingErrors: parsed.processingErrors
       };
     } else {
       return {

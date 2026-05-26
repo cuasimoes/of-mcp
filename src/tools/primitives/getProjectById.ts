@@ -1,5 +1,6 @@
 import { executeOmniFocusScript } from '../../utils/scriptExecution.js';
 import { logger } from '../../utils/logger.js';
+import { ProcessingErrors } from '../../utils/formatUtils.js';
 
 const log = logger.child('getProjectById');
 
@@ -35,7 +36,7 @@ export interface ProjectInfo {
 /**
  * Get project information by ID or name from OmniFocus
  */
-export async function getProjectById(params: GetProjectByIdParams): Promise<{success: boolean, project?: ProjectInfo, error?: string}> {
+export async function getProjectById(params: GetProjectByIdParams): Promise<{success: boolean, project?: ProjectInfo, processingErrors?: ProcessingErrors, error?: string}> {
   try {
     // Validate parameters
     if (!params.projectId && !params.projectName) {
@@ -73,9 +74,13 @@ export async function getProjectById(params: GetProjectByIdParams): Promise<{suc
     }
 
     if (parsed.success) {
+      if (parsed.processingErrors) {
+        log.warn('getProjectById returned processing errors', parsed.processingErrors);
+      }
       return {
         success: true,
-        project: parsed.project as ProjectInfo
+        project: parsed.project as ProjectInfo,
+        processingErrors: parsed.processingErrors
       };
     } else {
       return {

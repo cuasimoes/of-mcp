@@ -3,6 +3,12 @@
 //   filterErrors / serializationErrors - tasks dropped during filter/serialize (issue #104/#109)
 //   metadataErrors                     - optional fields that could not be read; the item still
 //                                        appears but a field falls back to '-', 0, or null (issue #110)
+// Shape attached by OmniJS scripts that count optional-field read failures (issue #110).
+export interface ProcessingErrors {
+  metadataErrors: number;
+  samples: string[];
+}
+
 export function formatProcessingWarnings(processingErrors: any): string {
   if (!processingErrors) return '';
   const filterErrors = processingErrors.filterErrors || 0;
