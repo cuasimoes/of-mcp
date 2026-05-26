@@ -1,6 +1,23 @@
-# OmniFocus MCP Server - What's New (v1.30.10)
+# OmniFocus MCP Server - What's New (v1.30.11)
 
 > Summary of changes from Sprints 1-10 for AI assistants using this MCP server.
+
+## v1.30.11 Fix parent lookups + surface metadata read errors in entity-lookup tools (Issue #110, Phase 3)
+
+**Two parent-field fixes (most user-visible).** Both were wrong-property guards that tested a sub-property which does not exist, so the guarded body never ran and the field was *always* null — invisible to error-handling because nothing ever threw:
+
+- **`get_folder_by_id`** now populates `parentFolderName` / `parentFolderId` (and shows a `• Parent Folder:` line) when a folder is nested inside another folder. The guard previously checked a non-existent `folder.parent.folder`. Top-level folders correctly still show no parent.
+- **`get_task_by_id`** now populates `parentName` / `parentId` (and shows a `• Parent Task:` line) for a **genuine subtask** (a task nested under another task). The guard previously checked a non-existent `task.parent.task`. Top-level tasks correctly still show *no* parent (their `parent` is the project's hidden root task, which is excluded via `task.parent.project`) and continue to show their `• Project:` line as before.
+
+**Error-surfacing for the three entity-lookup tools.** `get_project_by_id`, `get_folder_by_id`, and `get_task_by_id` no longer silently swallow optional-field read errors. Previously, if a project's task count / folder / review dates, a folder's project or subfolder counts, or a task's parent / project / tags couldn't be read, the `catch` block discarded the error and the field silently fell back to `0`/`null`. These tools now count such failures and append a **⚠️ Processing Warnings** section (up to 3 sample messages) and emit a server-side `log.warn`.
+
+**Impact:** Error-free calls produce identical output to before — the warning only appears when a field actually failed to read. The entity itself is still returned; this only adds visibility into incomplete data.
+
+**Cache caveat (`get_task_by_id` only):** this tool caches its result, so if a lookup ever does produce a warning, the warning re-surfaces on subsequent cache hits for the same task until the cache entry expires.
+
+**Pattern.** This reuses the `processingErrors: { metadataErrors, samples }` contract from v1.30.10 (Phase 2), rendered by the shared `formatProcessingWarnings()`. The shared `ProcessingErrors` type now lives in `src/utils/formatUtils.ts`. Defensive folder-traversal guards that return a safe default (`getEffectiveStatus`) remain intentionally uncounted. Remaining: Phase 4 = `editItem.js`.
+
+---
 
 ## v1.30.10 Surface metadata read errors in project listing tools (Issue #110, Phase 2)
 

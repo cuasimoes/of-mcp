@@ -1,5 +1,6 @@
 import { executeOmniFocusScript } from '../../utils/scriptExecution.js';
 import { logger } from '../../utils/logger.js';
+import { ProcessingErrors } from '../../utils/formatUtils.js';
 
 const log = logger.child('listProjects');
 
@@ -19,11 +20,6 @@ interface ProjectInfo {
   folderId: string | null;
   folderName: string | null;
   nextReviewDate: string | null;
-}
-
-interface ProcessingErrors {
-  metadataErrors: number;
-  samples: string[];
 }
 
 interface ListProjectsResult {

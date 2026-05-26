@@ -1,6 +1,7 @@
 import { executeOmniFocusScript } from '../../utils/scriptExecution.js';
 import { queryCache } from '../../utils/cache.js';
 import { logger } from '../../utils/logger.js';
+import { ProcessingErrors } from '../../utils/formatUtils.js';
 
 const log = logger.child('getTaskById');
 
@@ -33,7 +34,7 @@ export interface TaskInfo {
  * Get task information by ID or name from OmniFocus
  * Uses OmniJS to avoid AppleScript escaping issues with special characters like $
  */
-export async function getTaskById(params: GetTaskByIdParams): Promise<{success: boolean, task?: TaskInfo, error?: string}> {
+export async function getTaskById(params: GetTaskByIdParams): Promise<{success: boolean, task?: TaskInfo, processingErrors?: ProcessingErrors, error?: string}> {
   try {
     // Validate parameters
     if (!params.taskId && !params.taskName) {
@@ -49,7 +50,7 @@ export async function getTaskById(params: GetTaskByIdParams): Promise<{success: 
     };
 
     // Check cache first (getWithChecksum returns checksum for race-condition-free set)
-    type CacheResult = {success: boolean, task?: TaskInfo, error?: string};
+    type CacheResult = {success: boolean, task?: TaskInfo, processingErrors?: ProcessingErrors, error?: string};
     const { data: cached, checksum } = await queryCache.getWithChecksum<CacheResult>('getTaskById', scriptParams);
     if (cached) {
       log.debug('Using cached result');
@@ -77,8 +78,12 @@ export async function getTaskById(params: GetTaskByIdParams): Promise<{success: 
       parsed = result;
     }
 
+    if (parsed.success && parsed.processingErrors) {
+      log.warn('getTaskById returned processing errors', parsed.processingErrors);
+    }
+
     const response: CacheResult = parsed.success
-      ? { success: true, task: parsed.task as TaskInfo }
+      ? { success: true, task: parsed.task as TaskInfo, processingErrors: parsed.processingErrors }
       : { success: false, error: parsed.error || "Unknown error" };
 
     // Cache the result with the same checksum used for validation
