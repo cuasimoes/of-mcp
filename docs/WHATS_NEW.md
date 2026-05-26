@@ -1,6 +1,20 @@
-# OmniFocus MCP Server - What's New (v1.30.11)
+# OmniFocus MCP Server - What's New (v1.30.12)
 
 > Summary of changes from Sprints 1-10 for AI assistants using this MCP server.
+
+## v1.30.12 Surface review-interval template-lookup error in edit_item (Issue #110, Phase 4 — closes #110)
+
+**`edit_item`'s "Cannot set review interval" error is no longer silently misleading.** When `edit_item` is called with `newReviewInterval` on a project that has no existing interval, the script tries to copy a template from any other project that does. Previously, if that template-search loop threw (e.g. a Bridge proxy hiccup mid-iteration), the error was swallowed by an empty `} catch (e) {}` and the user only saw the generic "Cannot set review interval - project has no existing interval to modify" — even when other projects with intervals existed.
+
+The error message now appends the underlying cause when the template lookup actually failed, e.g.: `Cannot set review interval - project has no existing interval to modify (template lookup failed: <reason>)`. When the lookup runs cleanly and just finds no candidate (the normal "no project has any review interval set" case), the message is unchanged.
+
+**Impact:** Identical to before on every existing success path. On error paths where the template search threw, the user now sees the real cause. No new tools, no schema changes, no TS-layer changes — the improved error string flows through the existing `parsed.error` path.
+
+**Pattern note.** This catch sits inside an error-return path (when the template loop throws, `reviewInterval` stays null and `edit_item` always errors out), so the Phase 2/3 success-JSON `processingErrors` warning pattern would have been architecturally dead code here. Propagating the cause into the error message is the honest equivalent — same goal (don't silently swallow), different vehicle (the error string instead of a warning section).
+
+**Closes #110.** This is the final phase. Phase 1 (PR #120, v1.30.9) removed dead `omnifocusDump.js`; Phase 2 (PR #121, v1.30.10) instrumented `list_projects` / `get_projects_for_review`; Phase 3 (PR #122, v1.30.11) instrumented the three entity-lookup tools and fixed two parent-field guards; Phase 4 (this) closes the last catalogued silent catch.
+
+---
 
 ## v1.30.11 Fix parent lookups + surface metadata read errors in entity-lookup tools (Issue #110, Phase 3)
 
