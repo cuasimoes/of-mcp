@@ -188,16 +188,16 @@ database. Absence of these log lines in TC2–TC5 is the expected, correct resul
 
 | Test | Result | Notes |
 |------|--------|-------|
-| TC1 Version gate | ☐ PASS ☐ FAIL | |
-| TC2 get_project_by_id happy path | ☐ PASS ☐ FAIL | |
-| TC3 get_folder_by_id parent fix | ☐ PASS ☐ FAIL | |
-| TC4 get_task_by_id parent fix + guard | ☐ PASS ☐ FAIL | |
-| TC5 regression sweep | ☐ PASS ☐ FAIL | |
-| TC6 warning path (optional) | ☐ n/a ☐ triggered | |
+| TC1 Version gate | ☑ PASS ☐ FAIL | `get_server_version` → `1.30.11` (branch `claude/refine-local-plan-Zzg2b` @ `3b34cc9`) |
+| TC2 get_project_by_id happy path | ☑ PASS ☐ FAIL | Foldered project, 10 tasks: full Project + Review block, no warning section |
+| TC3 get_folder_by_id parent fix | ☑ PASS ☐ FAIL | Nested folder shows `Parent Folder: <name>`; top-level folder (8 subfolders) shows none; no warnings. Parent subfolder-count and child parent-name agree both directions |
+| TC4 get_task_by_id parent fix + guard | ☑ PASS ☐ FAIL | Subtask shows `Parent Task` + `Project` (verified two levels deep); top-level task shows `Project` and NO `Parent Task`. Guard confirmed on synthetic `test-project` and a real foldered project |
+| TC5 regression sweep | ☑ PASS ☐ FAIL | ~16 lookups across all three tools (projects ±folder, nested + top-level folders, subtask + top-level tasks); zero `Processing Warnings` sections |
+| TC6 warning path (optional) | ☑ n/a ☐ triggered | Not triggered (expected on healthy DB); render path covered by the automated check |
 
-**Overall:** ☐ PASS (TC1–TC5 all pass) ☐ FAIL
+**Overall:** ☑ PASS (TC1–TC5 all pass) ☐ FAIL
 
-**Run:** _(fill in date / tester / build under test)_
+**Run:** 2026-05-25 / MoJen (Claude Code session) / branch `claude/refine-local-plan-Zzg2b` @ `3b34cc9`, server v1.30.11 (entity names sanitised)
 
 ---
 
