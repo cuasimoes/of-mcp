@@ -1,6 +1,22 @@
-# OmniFocus MCP Server - What's New (v1.30.12)
+# OmniFocus MCP Server - What's New (v1.30.13)
 
 > Summary of changes from Sprints 1-10 for AI assistants using this MCP server.
+
+## v1.30.13 Reject non-positive / non-integer `newReviewInterval` in `edit_item` (Issue #124)
+
+**`edit_item(itemType: "project", newReviewInterval: 0)` no longer reports a fake success.** Previously, passing `0` (or any other value that OmniFocus silently refused, e.g. negative numbers or fractional values) would return `✅ Project "<name>" updated successfully (review interval).` while the project's interval, next-review date, and last-reviewed date remained byte-identical — the response said the call had taken effect when it hadn't. The misleading success made failed clear-attempts indistinguishable from real updates.
+
+The Zod schema for `newReviewInterval` is now constrained to **positive integers** (`.int().positive()`). `0`, negatives like `-5`, and non-integers like `1.5` are rejected at the MCP boundary with `"newReviewInterval must be a positive integer"`, before the `editItem` handler runs. Legitimate positive integers continue to work unchanged.
+
+**Surface change for callers.** The rejection surfaces as an MCP `InvalidParams` protocol error (in Claude, typically an "Error calling tool" red-flag), *not* as a tool result with `isError: true` and *not* as a `{ success: false, error: "…" }` shape from the underlying script. The substring `"newReviewInterval must be a positive integer"` appears inside the JSON-stringified Zod issues array. Callers that previously branched on the tool-result success field will now hit the protocol-error path instead — which is the correct outcome (these values were never valid).
+
+**Reachability.** The fix closes the gap surfaced by the [v1.30.12 reachability note](#v1.30.12-surface-review-interval-template-lookup-error-in-edit_item-issue-110-phase-4-closes-110): the no-interval state remains unconstructible from the MCP today (`add_project` still auto-assigns a 7-day default; OmniFocus appears to require every project to have an interval), but the misleading-success path that hid that fact is now gone. The Phase 4 `templateError` plumbing in `editItem.js` is unchanged.
+
+**Forward-compat note.** `batch_edit_items` does not currently expose `newReviewInterval`. If review-interval support is ever added to the batch tool, the same `.int().positive()` constraint should travel with it so the two entry points agree.
+
+**Impact.** No change to legitimate review-interval updates. Calls that pass `0`, negative integers, or fractional values — previously silent-success or undefined-behaviour — now produce a clear validation error.
+
+---
 
 ## v1.30.12 Surface review-interval template-lookup error in edit_item (Issue #110, Phase 4 — closes #110)
 
