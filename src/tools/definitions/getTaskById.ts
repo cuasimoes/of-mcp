@@ -78,7 +78,8 @@ export async function handler(args: z.infer<typeof schema>, _extra: RequestHandl
             infoText += `  ${status} ${child.name}${hasMore} [ID: ${child.id}]\n`;
           }
         } else {
-          infoText += `• **Has Children**: Yes (${task.childrenCount} subtask(s), details unavailable)\n`;
+          const reason = task.childrenError ? ` — ${task.childrenError}` : '';
+          infoText += `• **Has Children**: Yes (${task.childrenCount} subtask(s), details unavailable${reason})\n`;
         }
       } else {
         infoText += `• **Has Children**: No\n`;

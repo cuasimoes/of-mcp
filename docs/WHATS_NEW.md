@@ -10,7 +10,7 @@
 
 **Depth cap:** Only direct children are returned. Grandchildren are not enumerated — use `get_task_by_id` on a child's ID to traverse further.
 
-**Robustness:** If children can't be loaded (e.g. during an OmniFocus sync), `children` defaults to `[]` and a `childrenError` field is set with the reason. `hasChildren` and `childrenCount` are always derived from the successfully-built children list, so they stay consistent.
+**Robustness:** If children can't be loaded (e.g. during an OmniFocus sync), `children` defaults to `[]` and a `childrenError` field is set with the reason. `hasChildren` and `childrenCount` are sourced from the task itself, not the built list — so a subtask-load failure surfaces as `children: []` plus a `childrenError` (shown on the `Has Children` line) without misreporting a task that has children as childless.
 
 ---
 

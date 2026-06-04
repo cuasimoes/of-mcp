@@ -74,7 +74,7 @@
       isRepeating: foundTask.repetitionRule !== null
     };
 
-    // Build children list — derived so hasChildren/childrenCount stay consistent
+    // Build children list (one level of direct subtasks)
     try {
       if (foundTask.children && foundTask.children.length > 0) {
         taskInfo.children = foundTask.children.map(child => ({
@@ -92,8 +92,11 @@
     } catch (e) {
       taskInfo.childrenError = `Could not load subtasks: ${e}`;
     }
-    taskInfo.hasChildren = taskInfo.children.length > 0;
-    taskInfo.childrenCount = taskInfo.children.length;
+    // Source hasChildren/childrenCount from the task itself rather than the built list,
+    // so a subtask-load failure leaves children:[] + childrenError set without making a
+    // task that has children report as childless.
+    taskInfo.hasChildren = foundTask.hasChildren;
+    taskInfo.childrenCount = foundTask.children ? foundTask.children.length : 0;
 
     // Get parent info. A top-level task's parent is the project's root task
     // (whose .project is truthy); only report a genuine subtask's parent here.
