@@ -14,6 +14,95 @@
 
 ---
 
+## v1.30.14 Fix forecast date grouping and display for all timezones (#114)
+
+**`get_forecast_tasks` now groups tasks under the correct local date for UTC+ users.**
+`getDateKey` in `forecastTasks.js` previously called `toISOString()` after zeroing the time, which converts back to UTC — in a UTC+10 environment, local midnight April 28 became the key `"2026-04-27"`, placing tasks under the wrong day. The key is now built directly from local year/month/date components.
+
+**`formatDateSafe` now displays the correct date for bare `YYYY-MM-DD` strings in UTC- timezones.**
+`new Date("2026-04-28")` is parsed as UTC midnight, which `toLocaleDateString()` then renders as April 27 for UTC-X users. Bare date strings are now constructed with the local-time form `new Date(year, month, day)` to keep the displayed date accurate.
+
+**`formatDateSafe` rejects malformed bare dates instead of silently rolling them forward.**
+The local-time constructor `new Date(year, month, day)` rolls overflow forward (e.g. `2026-13-45` → February 2027), so an invalid-but-well-shaped string would render as a bogus date. A round-trip check now returns `null` for these, matching the prior `new Date("2026-13-45")` behaviour.
+
+---
+
+## v1.30.13 Reject non-positive / non-integer `newReviewInterval` in `edit_item` (Issue #124)
+
+**`edit_item(itemType: "project", newReviewInterval: 0)` no longer reports a fake success.** Previously, passing `0` (or any other value that OmniFocus silently refused, e.g. negative numbers or fractional values) would return `✅ Project "<name>" updated successfully (review interval).` while the project's interval, next-review date, and last-reviewed date remained byte-identical — the response said the call had taken effect when it hadn't. The misleading success made failed clear-attempts indistinguishable from real updates.
+
+The Zod schema for `newReviewInterval` is now constrained to **positive integers** (`.int().positive()`). `0`, negatives like `-5`, and non-integers like `1.5` are rejected at the MCP boundary with `"newReviewInterval must be a positive integer"`, before the `editItem` handler runs. Legitimate positive integers continue to work unchanged.
+
+**Surface change for callers.** The rejection surfaces as an MCP `InvalidParams` protocol error (in Claude, typically an "Error calling tool" red-flag), *not* as a tool result with `isError: true` and *not* as a `{ success: false, error: "…" }` shape from the underlying script. The substring `"newReviewInterval must be a positive integer"` appears inside the JSON-stringified Zod issues array. Callers that previously branched on the tool-result success field will now hit the protocol-error path instead — which is the correct outcome (these values were never valid).
+
+**Reachability.** The fix closes the gap surfaced by the [v1.30.12 reachability note](#v1.30.12-surface-review-interval-template-lookup-error-in-edit_item-issue-110-phase-4-closes-110): the no-interval state remains unconstructible from the MCP today (`add_project` still auto-assigns a 7-day default; OmniFocus appears to require every project to have an interval), but the misleading-success path that hid that fact is now gone. The Phase 4 `templateError` plumbing in `editItem.js` is unchanged.
+
+**Forward-compat note.** `batch_edit_items` does not currently expose `newReviewInterval`. If review-interval support is ever added to the batch tool, the same `.int().positive()` constraint should travel with it so the two entry points agree.
+
+**Impact.** No change to legitimate review-interval updates. Calls that pass `0`, negative integers, or fractional values — previously silent-success or undefined-behaviour — now produce a clear validation error.
+
+---
+
+## v1.30.12 Surface review-interval template-lookup error in edit_item (Issue #110, Phase 4 — closes #110)
+
+**`edit_item`'s "Cannot set review interval" error is no longer silently misleading.** When `edit_item` is called with `newReviewInterval` on a project that has no existing interval, the script tries to copy a template from any other project that does. Previously, if that template-search loop threw (e.g. a Bridge proxy hiccup mid-iteration), the error was swallowed by an empty `} catch (e) {}` and the user only saw the generic "Cannot set review interval - project has no existing interval to modify" — even when other projects with intervals existed.
+
+The error message now appends the underlying cause when the template lookup actually failed, e.g.: `Cannot set review interval - project has no existing interval to modify (template lookup failed: <reason>)`. When the lookup runs cleanly and just finds no candidate (the normal "no project has any review interval set" case), the message is unchanged.
+
+**Impact:** Identical to before on every existing success path. On error paths where the template search threw, the user now sees the real cause. No new tools, no schema changes, no TS-layer changes — the improved error string flows through the existing `parsed.error` path.
+
+**Reachability note.** On a normal MCP-managed database this code path is **not currently reachable**: the precondition (a project with no review interval) can't be constructed via the MCP — `add_project` auto-assigns a default interval and `edit_item newReviewInterval: 0` silently no-ops (tracked as #124). The fix is therefore **defensive** — it removes the silent catch and surfaces the cause if the path ever does fire (e.g. a database modified outside the MCP, or once #124 resolves in a way that opens the no-interval state to MCP callers). No observable MCP change on a healthy DB today; the smoke test plan accordingly marks TC3 / TC4 as n/a.
+
+**Pattern note.** This catch sits inside an error-return path (when the template loop throws, `reviewInterval` stays null and `edit_item` always errors out), so the Phase 2/3 success-JSON `processingErrors` warning pattern would have been architecturally dead code here. Propagating the cause into the error message is the honest equivalent — same goal (don't silently swallow), different vehicle (the error string instead of a warning section).
+
+**Closes #110.** This is the final phase. Phase 1 (PR #120, v1.30.9) removed dead `omnifocusDump.js`; Phase 2 (PR #121, v1.30.10) instrumented `list_projects` / `get_projects_for_review`; Phase 3 (PR #122, v1.30.11) instrumented the three entity-lookup tools and fixed two parent-field guards; Phase 4 (this) closes the last catalogued silent catch.
+
+---
+
+## v1.30.11 Fix parent lookups + surface metadata read errors in entity-lookup tools (Issue #110, Phase 3)
+
+**Two parent-field fixes (most user-visible).** Both were wrong-property guards that tested a sub-property which does not exist, so the guarded body never ran and the field was *always* null — invisible to error-handling because nothing ever threw:
+
+- **`get_folder_by_id`** now populates `parentFolderName` / `parentFolderId` (and shows a `• Parent Folder:` line) when a folder is nested inside another folder. The guard previously checked a non-existent `folder.parent.folder`. Top-level folders correctly still show no parent.
+- **`get_task_by_id`** now populates `parentName` / `parentId` (and shows a `• Parent Task:` line) for a **genuine subtask** (a task nested under another task). The guard previously checked a non-existent `task.parent.task`. Top-level tasks correctly still show *no* parent (their `parent` is the project's hidden root task, which is excluded via `task.parent.project`) and continue to show their `• Project:` line as before.
+
+**Error-surfacing for the three entity-lookup tools.** `get_project_by_id`, `get_folder_by_id`, and `get_task_by_id` no longer silently swallow optional-field read errors. Previously, if a project's task count / folder / review dates, a folder's project or subfolder counts, or a task's parent / project / tags couldn't be read, the `catch` block discarded the error and the field silently fell back to `0`/`null`. These tools now count such failures and append a **⚠️ Processing Warnings** section (up to 3 sample messages) and emit a server-side `log.warn`.
+
+**Impact:** Error-free calls produce identical output to before — the warning only appears when a field actually failed to read. The entity itself is still returned; this only adds visibility into incomplete data.
+
+**Cache caveat (`get_task_by_id` only):** this tool caches its result, so if a lookup ever does produce a warning, the warning re-surfaces on subsequent cache hits for the same task until the cache entry expires.
+
+**Pattern.** This reuses the `processingErrors: { metadataErrors, samples }` contract from v1.30.10 (Phase 2), rendered by the shared `formatProcessingWarnings()`. The shared `ProcessingErrors` type now lives in `src/utils/formatUtils.ts`. Defensive folder-traversal guards that return a safe default (`getEffectiveStatus`) remain intentionally uncounted. Remaining: Phase 4 = `editItem.js`.
+
+---
+
+## v1.30.10 Surface metadata read errors in project listing tools (Issue #110, Phase 2)
+
+**`list_projects` and `get_projects_for_review` no longer silently swallow optional-field read errors.** Previously, if a project's task count, folder info, or review date/interval couldn't be read, the `catch` block discarded the error and the field silently fell back to `0`/`null` — so a partial result was indistinguishable from a complete one. These tools now count such failures and append a **⚠️ Processing Warnings** section (e.g. "2 details could not be read; affected fields may show as '-', 0, or null") with up to 3 sample messages, and emit a server-side `log.warn`.
+
+**Impact:** Error-free calls produce identical output to before — the warning only appears when a field actually failed to read. The projects themselves are still listed; this only adds visibility into incomplete data.
+
+**Also fixed (`get_projects_for_review`):** each project now correctly shows its **folder**. The script was reading a non-existent `project.folder` property (always `undefined`) instead of `project.parentFolder`, so the folder line was silently always blank. This was a wrong-property bug, not a swallowed exception, so it was invisible to the error-surfacing above — found during Phase 2 testing. `list_projects` was never affected (it already used `parentFolder`).
+
+**Pattern.** This reuses the `processingErrors` mechanism from v1.30.7 (issue #104/#109), generalized with a new `metadataErrors` category in `formatProcessingWarnings()`. The `processingErrors: { metadataErrors, samples }` contract is the template for the remaining #110 phases (`getProjectByName.js`, `getFolderByName.js`, `getTaskByIdOrName.js`, `editItem.js`). Defensive folder-traversal guards that return a safe default (`isInDroppedFolder`/`isEffectivelyDropped`) are intentionally left uncounted.
+
+---
+
+## v1.30.9 Remove dead dump_database code (Issue #110)
+
+**Removed orphaned remnants of the old `dump_database` feature.** The `dump_database` tool itself was removed long ago, but three files were left behind as dead code that nothing referenced:
+- `src/utils/omnifocusScripts/omnifocusDump.js` — the OmniJS export script (no tool executed it)
+- `src/types.ts` — the dump's data-model interfaces (`OmnifocusTask`, `OmnifocusDatabase`, etc.; zero imports, not a published type surface)
+- `src/omnifocustypes.ts` — unused `Minimal` types
+
+Also corrected a stale hint in the `list_projects` tool description that referenced the non-existent `dump_database` tool.
+
+**Impact:** None for users — no tool behavior changes. This is pure dead-code removal.
+
+**Relation to issue #110.** #110 catalogues silent `catch` blocks across OmniJS scripts. The `omnifocusDump.js` cases it lists were in this dead script, so they are resolved by deletion rather than by adding error reporting. The remaining live scripts named in #110 (`listProjects.js`, `getProjectsForReview.js`, `getProjectByName.js`, `getFolderByName.js`, `getTaskByIdOrName.js`, `editItem.js`) are tracked as follow-up work.
+
+---
+
 ## v1.30.8 Fix add_project folderName case sensitivity (Issue #112)
 
 **`add_project` folder name lookup is now case-insensitive.** Previously `add_project` required an exact-case match on `folderName`, while `batch_add_items` and `edit_item` already matched case-insensitively. All three tools now behave consistently — e.g. `folderName: "work projects"` resolves to an existing `Work Projects` folder.

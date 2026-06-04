@@ -46,7 +46,12 @@ export const schema = z.object({
 
   // Project review fields
   markReviewed: z.boolean().optional().describe("Mark project as reviewed (advances next review date by interval). Only applies to projects."),
-  newReviewInterval: z.number().optional().describe("Set new review interval in days. Only applies to projects."),
+  newReviewInterval: z
+    .number()
+    .int("newReviewInterval must be a positive integer")
+    .positive("newReviewInterval must be a positive integer")
+    .optional()
+    .describe("Set new review interval in days (must be a positive integer). Only applies to projects."),
   newNextReviewDate: z.string().optional().describe("Set next review date directly (ISO format YYYY-MM-DD). Only applies to projects.")
 });
 

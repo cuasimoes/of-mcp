@@ -1,5 +1,6 @@
 import { executeOmniFocusScript } from '../../utils/scriptExecution.js';
 import { logger } from '../../utils/logger.js';
+import { ProcessingErrors } from '../../utils/formatUtils.js';
 
 const log = logger.child('listProjects');
 
@@ -27,6 +28,7 @@ interface ListProjectsResult {
   folderFilter: string | null;
   statusFilter: string;
   projects: ProjectInfo[];
+  processingErrors?: ProcessingErrors;
   error?: string;
 }
 
@@ -73,6 +75,10 @@ export async function listProjects(options: ListProjectsOptions = {}): Promise<L
       }
     } else {
       parsed = result as ListProjectsResult;
+    }
+
+    if (parsed.processingErrors) {
+      log.warn('listProjects returned processing errors', parsed.processingErrors);
     }
 
     return parsed;

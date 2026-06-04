@@ -3,6 +3,7 @@ import { getProjectsForReview, GetProjectsForReviewParams } from '../primitives/
 import { RequestHandlerExtra } from '@modelcontextprotocol/sdk/shared/protocol.js';
 import { ServerRequest, ServerNotification } from '@modelcontextprotocol/sdk/types.js';
 import { logger } from '../../utils/logger.js';
+import { formatProcessingWarnings } from '../../utils/formatUtils.js';
 
 const log = logger.child('def:getProjectsForReview');
 
@@ -54,6 +55,10 @@ export async function handler(args: z.infer<typeof schema>, _extra: RequestHandl
 
         infoText += '\n';
       }
+
+      // Surface any optional-field read failures (issue #110)
+      const warnings = formatProcessingWarnings(result.processingErrors);
+      if (warnings) infoText += `\n${warnings}`;
 
       return {
         content: [{

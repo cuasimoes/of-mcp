@@ -4,6 +4,7 @@ import { RequestHandlerExtra } from '@modelcontextprotocol/sdk/shared/protocol.j
 import { ServerRequest, ServerNotification } from '@modelcontextprotocol/sdk/types.js';
 import { formatDateSafe } from '../../utils/dateUtils.js';
 import { logger } from '../../utils/logger.js';
+import { formatProcessingWarnings } from '../../utils/formatUtils.js';
 
 const log = logger.child('def:getTaskById');
 
@@ -86,6 +87,10 @@ export async function handler(args: z.infer<typeof schema>, _extra: RequestHandl
       if (task.isRepeating && task.repetitionRule) {
         infoText += `• **Repeats**: ${task.repetitionRule}\n`;
       }
+
+      // Surface any optional-field read failures (issue #110)
+      const warnings = formatProcessingWarnings(result.processingErrors);
+      if (warnings) infoText += `\n${warnings}`;
 
       return {
         content: [{

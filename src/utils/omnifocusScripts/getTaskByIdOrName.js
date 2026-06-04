@@ -6,6 +6,11 @@
     const taskId = args.taskId || null;
     const taskName = args.taskName || null;
 
+    // Track optional-field read failures instead of swallowing them silently (issue #110)
+    const MAX_ERROR_SAMPLES = 3;
+    let metadataErrorCount = 0;
+    const errorSamples = [];
+
     if (!taskId && !taskName) {
       return JSON.stringify({
         success: false,
@@ -90,14 +95,18 @@
     taskInfo.hasChildren = taskInfo.children.length > 0;
     taskInfo.childrenCount = taskInfo.children.length;
 
-    // Get parent info
+    // Get parent info. A top-level task's parent is the project's root task
+    // (whose .project is truthy); only report a genuine subtask's parent here.
     try {
-      if (foundTask.parent && foundTask.parent.task) {
+      if (foundTask.parent && !foundTask.parent.project) {
         taskInfo.parentId = foundTask.parent.id.primaryKey;
         taskInfo.parentName = foundTask.parent.name;
       }
     } catch (e) {
-      // Parent not accessible
+      metadataErrorCount++;
+      if (errorSamples.length < MAX_ERROR_SAMPLES) {
+        errorSamples.push(`parent(${foundTask.name || 'unknown'}): ${e.message || String(e)}`);
+      }
     }
 
     // Get project info
@@ -107,7 +116,10 @@
         taskInfo.projectName = foundTask.containingProject.name;
       }
     } catch (e) {
-      // Project not accessible
+      metadataErrorCount++;
+      if (errorSamples.length < MAX_ERROR_SAMPLES) {
+        errorSamples.push(`project(${foundTask.name || 'unknown'}): ${e.message || String(e)}`);
+      }
     }
 
     // Get tags
@@ -119,13 +131,20 @@
         }));
       }
     } catch (e) {
-      // Tags not accessible
+      metadataErrorCount++;
+      if (errorSamples.length < MAX_ERROR_SAMPLES) {
+        errorSamples.push(`tags(${foundTask.name || 'unknown'}): ${e.message || String(e)}`);
+      }
     }
 
-    return JSON.stringify({
+    const result = {
       success: true,
       task: taskInfo
-    });
+    };
+    if (metadataErrorCount > 0) {
+      result.processingErrors = { metadataErrors: metadataErrorCount, samples: errorSamples };
+    }
+    return JSON.stringify(result);
 
   } catch (error) {
     return JSON.stringify({
