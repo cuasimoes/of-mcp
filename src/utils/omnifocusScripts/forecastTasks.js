@@ -8,12 +8,16 @@
 
     // formatDate and taskStatusMap are provided by sharedUtils.js
 
-    // Helper function to get date without time for grouping
+    // Helper function to get date without time for grouping.
+    // Build the key from local year/month/date components — toISOString()
+    // converts back to UTC, which shifts the day for UTC+ users.
     function getDateKey(date) {
       if (!date) return null;
       const d = new Date(date);
-      d.setHours(0, 0, 0, 0);
-      return d.toISOString().split('T')[0];
+      const y = d.getFullYear();
+      const m = String(d.getMonth() + 1).padStart(2, '0');
+      const day = String(d.getDate()).padStart(2, '0');
+      return `${y}-${m}-${day}`;
     }
 
     function getTaskStatus(status) {

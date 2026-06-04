@@ -1,6 +1,19 @@
-# OmniFocus MCP Server - What's New (v1.30.13)
+# OmniFocus MCP Server - What's New (v1.30.14)
 
 > Summary of changes from Sprints 1-10 for AI assistants using this MCP server.
+
+## v1.30.14 Fix forecast date grouping and display for all timezones (#114)
+
+**`get_forecast_tasks` now groups tasks under the correct local date for UTC+ users.**
+`getDateKey` in `forecastTasks.js` previously called `toISOString()` after zeroing the time, which converts back to UTC — in a UTC+10 environment, local midnight April 28 became the key `"2026-04-27"`, placing tasks under the wrong day. The key is now built directly from local year/month/date components.
+
+**`formatDateSafe` now displays the correct date for bare `YYYY-MM-DD` strings in UTC- timezones.**
+`new Date("2026-04-28")` is parsed as UTC midnight, which `toLocaleDateString()` then renders as April 27 for UTC-X users. Bare date strings are now constructed with the local-time form `new Date(year, month, day)` to keep the displayed date accurate.
+
+**`formatDateSafe` rejects malformed bare dates instead of silently rolling them forward.**
+The local-time constructor `new Date(year, month, day)` rolls overflow forward (e.g. `2026-13-45` → February 2027), so an invalid-but-well-shaped string would render as a bogus date. A round-trip check now returns `null` for these, matching the prior `new Date("2026-13-45")` behaviour.
+
+---
 
 ## v1.30.13 Reject non-positive / non-integer `newReviewInterval` in `edit_item` (Issue #124)
 
