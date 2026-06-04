@@ -62,8 +62,9 @@
       plannedDate: foundTask.plannedDate ? foundTask.plannedDate.toISOString() : null,
       estimatedMinutes: foundTask.estimatedMinutes || null,
       createdDate: foundTask.added ? foundTask.added.toISOString() : null,
-      hasChildren: foundTask.hasChildren,
-      childrenCount: foundTask.children ? foundTask.children.length : 0,
+      children: [],
+      hasChildren: false,
+      childrenCount: 0,
       parentId: null,
       parentName: null,
       projectId: null,
@@ -72,6 +73,30 @@
       repetitionRule: foundTask.repetitionRule ? foundTask.repetitionRule.toString() : null,
       isRepeating: foundTask.repetitionRule !== null
     };
+
+    // Build children list (one level of direct subtasks)
+    try {
+      if (foundTask.children && foundTask.children.length > 0) {
+        taskInfo.children = foundTask.children.map(child => ({
+          id: child.id.primaryKey,
+          name: child.name,
+          completed: child.taskStatus === Task.Status.Completed,
+          dropped: child.taskStatus === Task.Status.Dropped,
+          flagged: child.flagged,
+          dueDate: child.dueDate ? child.dueDate.toISOString() : null,
+          deferDate: child.deferDate ? child.deferDate.toISOString() : null,
+          hasChildren: child.hasChildren,
+          childrenCount: child.children ? child.children.length : 0
+        }));
+      }
+    } catch (e) {
+      taskInfo.childrenError = `Could not load subtasks: ${e}`;
+    }
+    // Source hasChildren/childrenCount from the task itself rather than the built list,
+    // so a subtask-load failure leaves children:[] + childrenError set without making a
+    // task that has children report as childless.
+    taskInfo.hasChildren = foundTask.hasChildren;
+    taskInfo.childrenCount = foundTask.children ? foundTask.children.length : 0;
 
     // Get parent info. A top-level task's parent is the project's root task
     // (whose .project is truthy); only report a genuine subtask's parent here.

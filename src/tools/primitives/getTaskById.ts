@@ -11,11 +11,26 @@ export interface GetTaskByIdParams {
   taskName?: string;
 }
 
+export interface ChildTaskSummary {
+  id: string;
+  name: string;
+  completed: boolean;
+  dropped: boolean;
+  flagged: boolean;
+  dueDate?: string | null;
+  deferDate?: string | null;
+  hasChildren: boolean;
+  childrenCount: number;
+}
+
 // Interface for task information result
 export interface TaskInfo {
   id: string;
   name: string;
   note: string;
+  completed: boolean;
+  dropped: boolean;
+  flagged: boolean;
   dueDate?: string | null;
   deferDate?: string | null;
   plannedDate?: string | null;
@@ -25,8 +40,10 @@ export interface TaskInfo {
   projectName?: string;
   hasChildren: boolean;
   childrenCount: number;
+  children?: ChildTaskSummary[];
+  childrenError?: string;
   createdDate?: string | null;
-  repetitionRule?: string | null; // iCal RRULE string representation
+  repetitionRule?: string | null;
   isRepeating?: boolean;
 }
 
@@ -82,9 +99,16 @@ export async function getTaskById(params: GetTaskByIdParams): Promise<{success: 
       log.warn('getTaskById returned processing errors', parsed.processingErrors);
     }
 
-    const response: CacheResult = parsed.success
-      ? { success: true, task: parsed.task as TaskInfo, processingErrors: parsed.processingErrors }
-      : { success: false, error: parsed.error || "Unknown error" };
+    let response: CacheResult;
+    if (parsed.success) {
+      const task = parsed.task as TaskInfo;
+      if (!Array.isArray(task.children)) {
+        task.children = [];
+      }
+      response = { success: true, task, processingErrors: parsed.processingErrors };
+    } else {
+      response = { success: false, error: parsed.error || "Unknown error" };
+    }
 
     // Cache the result with the same checksum used for validation
     await queryCache.set('getTaskById', scriptParams, response, checksum);
