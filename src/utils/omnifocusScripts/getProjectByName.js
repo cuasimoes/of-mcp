@@ -5,6 +5,11 @@
     const projectId = args.projectId || null;
     const projectName = args.projectName || null;
 
+    // Track optional-field read failures instead of swallowing them silently (issue #110)
+    const MAX_ERROR_SAMPLES = 3;
+    let metadataErrorCount = 0;
+    const errorSamples = [];
+
     if (!projectId && !projectName) {
       return JSON.stringify({
         success: false,
@@ -68,7 +73,10 @@
           }
           folder = folder.parent;
         }
-      } catch (e) {}
+      } catch (e) {
+        // Intentionally not counted: defensive guard that falls back to the
+        // project's own status on folder-traversal failure rather than failing (issue #110)
+      }
       // Return the project's own status
       return statusMap[project.status] || "Unknown";
     }
@@ -104,17 +112,35 @@
           else if (unit === 'months') seconds = steps * 30 * 24 * 60 * 60;
           else if (unit === 'years') seconds = steps * 365 * 24 * 60 * 60;
           return seconds;
-        } catch (e) { return null; }
+        } catch (e) {
+          metadataErrorCount++;
+          if (errorSamples.length < MAX_ERROR_SAMPLES) {
+            errorSamples.push(`reviewInterval(${foundProject.name || 'unknown'}): ${e.message || String(e)}`);
+          }
+          return null;
+        }
       })(),
       nextReviewDate: (function() {
         try {
           return foundProject.nextReviewDate ? foundProject.nextReviewDate.toISOString() : null;
-        } catch (e) { return null; }
+        } catch (e) {
+          metadataErrorCount++;
+          if (errorSamples.length < MAX_ERROR_SAMPLES) {
+            errorSamples.push(`nextReviewDate(${foundProject.name || 'unknown'}): ${e.message || String(e)}`);
+          }
+          return null;
+        }
       })(),
       lastReviewDate: (function() {
         try {
           return foundProject.lastReviewDate ? foundProject.lastReviewDate.toISOString() : null;
-        } catch (e) { return null; }
+        } catch (e) {
+          metadataErrorCount++;
+          if (errorSamples.length < MAX_ERROR_SAMPLES) {
+            errorSamples.push(`lastReviewDate(${foundProject.name || 'unknown'}): ${e.message || String(e)}`);
+          }
+          return null;
+        }
       })()
     };
 
@@ -127,7 +153,10 @@
         ).length;
       }
     } catch (e) {
-      // Task count not accessible
+      metadataErrorCount++;
+      if (errorSamples.length < MAX_ERROR_SAMPLES) {
+        errorSamples.push(`taskCount(${foundProject.name || 'unknown'}): ${e.message || String(e)}`);
+      }
     }
 
     // Get folder info (use parentFolder, not folder)
@@ -137,13 +166,20 @@
         projectInfo.folderName = foundProject.parentFolder.name;
       }
     } catch (e) {
-      // Folder not accessible
+      metadataErrorCount++;
+      if (errorSamples.length < MAX_ERROR_SAMPLES) {
+        errorSamples.push(`folder(${foundProject.name || 'unknown'}): ${e.message || String(e)}`);
+      }
     }
 
-    return JSON.stringify({
+    const result = {
       success: true,
       project: projectInfo
-    });
+    };
+    if (metadataErrorCount > 0) {
+      result.processingErrors = { metadataErrors: metadataErrorCount, samples: errorSamples };
+    }
+    return JSON.stringify(result);
 
   } catch (error) {
     return JSON.stringify({

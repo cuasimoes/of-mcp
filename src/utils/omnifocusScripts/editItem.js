@@ -394,6 +394,9 @@
 
         // Get the existing review interval or get a default one
         let reviewInterval = foundItem.reviewInterval;
+        // Capture any template-lookup failure so the cause surfaces in the
+        // error message if no template can be found (issue #110, Phase 4).
+        let templateError = null;
 
         if (!reviewInterval) {
           // Project may not have a review interval set - we need to create one
@@ -406,7 +409,9 @@
                 break;
               }
             }
-          } catch (e) {}
+          } catch (e) {
+            templateError = e.message || String(e);
+          }
         }
 
         if (reviewInterval) {
@@ -416,10 +421,13 @@
           foundItem.reviewInterval = reviewInterval;
           changedProperties.push("review interval");
         } else {
-          // Can't set interval - no template available
+          // Can't set interval - no template available. Surface the swallowed
+          // template-lookup error if one occurred (issue #110, Phase 4).
           return JSON.stringify({
             success: false,
-            error: `Cannot set review interval - project has no existing interval to modify`
+            error: templateError
+              ? `Cannot set review interval - project has no existing interval to modify (template lookup failed: ${templateError})`
+              : `Cannot set review interval - project has no existing interval to modify`
           });
         }
       } catch (e) {

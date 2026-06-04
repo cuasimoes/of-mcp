@@ -7,6 +7,11 @@
 
     const now = new Date();
 
+    // Track optional-field read failures instead of swallowing them silently (issue #110)
+    const MAX_ERROR_SAMPLES = 3;
+    let metadataErrorCount = 0;
+    const errorSamples = [];
+
     // Get project status string
     const statusMap = {
       [Project.Status.Active]: "Active",
@@ -31,7 +36,10 @@
           }
           folder = folder.parent; // Check parent folders too
         }
-      } catch (e) {}
+      } catch (e) {
+        // Intentionally not counted: defensive guard that returns a safe `false`
+        // on folder-traversal failure rather than dropping data (issue #110)
+      }
       return false;
     }
 
@@ -68,12 +76,16 @@
       let folderId = null;
       let folderName = null;
       try {
-        if (project.folder) {
-          folderId = project.folder.id.primaryKey;
-          folderName = project.folder.name;
+        // Use parentFolder, not folder (project.folder is always undefined; issue #110)
+        if (project.parentFolder) {
+          folderId = project.parentFolder.id.primaryKey;
+          folderName = project.parentFolder.name;
         }
       } catch (e) {
-        // Folder not accessible
+        metadataErrorCount++;
+        if (errorSamples.length < MAX_ERROR_SAMPLES) {
+          errorSamples.push(`folder(${project.name || 'unknown'}): ${e.message || String(e)}`);
+        }
       }
 
       let remainingTaskCount = 0;
@@ -84,7 +96,10 @@
           ).length;
         }
       } catch (e) {
-        // Task count not accessible
+        metadataErrorCount++;
+        if (errorSamples.length < MAX_ERROR_SAMPLES) {
+          errorSamples.push(`taskCount(${project.name || 'unknown'}): ${e.message || String(e)}`);
+        }
       }
 
       // Get review interval - ReviewInterval has .steps and .unit properties
@@ -100,7 +115,12 @@
           else if (unit === 'years') reviewIntervalSeconds = steps * 365 * 24 * 60 * 60;
           else reviewIntervalSeconds = steps;
         }
-      } catch (e) {}
+      } catch (e) {
+        metadataErrorCount++;
+        if (errorSamples.length < MAX_ERROR_SAMPLES) {
+          errorSamples.push(`reviewInterval(${project.name || 'unknown'}): ${e.message || String(e)}`);
+        }
+      }
 
       return {
         id: project.id.primaryKey,
@@ -115,12 +135,16 @@
       };
     });
 
-    return JSON.stringify({
+    const result = {
       success: true,
       totalCount: projectsNeedingReview.length,
       returnedCount: projects.length,
       projects: projects
-    });
+    };
+    if (metadataErrorCount > 0) {
+      result.processingErrors = { metadataErrors: metadataErrorCount, samples: errorSamples };
+    }
+    return JSON.stringify(result);
 
   } catch (error) {
     return JSON.stringify({

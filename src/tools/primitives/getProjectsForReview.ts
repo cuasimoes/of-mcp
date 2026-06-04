@@ -1,5 +1,6 @@
 import { executeOmniFocusScript } from '../../utils/scriptExecution.js';
 import { logger } from '../../utils/logger.js';
+import { ProcessingErrors } from '../../utils/formatUtils.js';
 
 const log = logger.child('getProjectsForReview');
 
@@ -30,6 +31,7 @@ export async function getProjectsForReview(params: GetProjectsForReviewParams): 
   totalCount?: number;
   returnedCount?: number;
   projects?: ProjectForReview[];
+  processingErrors?: ProcessingErrors;
   error?: string;
 }> {
   try {
@@ -61,11 +63,15 @@ export async function getProjectsForReview(params: GetProjectsForReviewParams): 
     }
 
     if (parsed.success) {
+      if (parsed.processingErrors) {
+        log.warn('getProjectsForReview returned processing errors', parsed.processingErrors);
+      }
       return {
         success: true,
         totalCount: parsed.totalCount,
         returnedCount: parsed.returnedCount,
-        projects: parsed.projects as ProjectForReview[]
+        projects: parsed.projects as ProjectForReview[],
+        processingErrors: parsed.processingErrors
       };
     } else {
       return {
