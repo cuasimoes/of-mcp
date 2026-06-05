@@ -19,7 +19,7 @@
     let tasksByName = null;
     let tasksById = null;
     let tagsByName = null;
-    let foldersByName = null;
+    let cachedFolders = null;
     let foldersById = null;
 
     function getProjectsByName() {
@@ -66,12 +66,11 @@
       return tagsByName;
     }
 
-    function getFoldersByName() {
-      if (!foldersByName) {
-        foldersByName = new Map();
-        flattenedFolders.forEach(f => foldersByName.set(f.name.toLowerCase(), f));
+    function getAllFolders() {
+      if (!cachedFolders) {
+        cachedFolders = flattenedFolders;
       }
-      return foldersByName;
+      return cachedFolders;
     }
 
     function getFoldersById() {
@@ -275,7 +274,7 @@
               container = getFoldersById().get(folderId);
             }
             if (!container && folderName) {
-              container = getFoldersByName().get(folderName.toLowerCase());
+              container = resolveFolderByName(folderName, getAllFolders());
             }
             if (!container) {
               const searchRef = folderId ? `ID "${folderId}"` : `name "${folderName}"`;

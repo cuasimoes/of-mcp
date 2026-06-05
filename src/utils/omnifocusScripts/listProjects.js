@@ -49,9 +49,31 @@
       return statusMap[project.status] || "Unknown";
     }
 
-    // Helper to check if project matches folder filter
+    // Resolve folder filter once (not per-project)
+    const resolvedFilterFolder = folderName
+      ? resolveFolderByName(folderName, flattenedFolders)
+      : null;
+    const filterFolderId = folderId || (resolvedFilterFolder ? resolvedFilterFolder.id.primaryKey : null);
+
+    // Fail closed: a folder filter was requested but didn't resolve (typo, deleted
+    // folder, or an ambiguous name). Return an explicit error rather than silently
+    // matching every project, which would look like a successful unfiltered result
+    // (issue #117 review). Matches add_project / duplicate_project / get_folder_by_id.
+    const folderFilterRequested = !!(folderId || folderName);
+    if (folderFilterRequested && !filterFolderId) {
+      return JSON.stringify({
+        success: false,
+        error: `Folder not found: "${folderName}". Use "Parent > Child" to disambiguate folders that share a name.`,
+        count: 0,
+        projects: []
+      });
+    }
+
+    // Helper to check if project matches folder filter.
+    // Intentionally shallow: only matches direct parent, not nested subfolders.
+    // Filtering by "Work" will not include projects in "Work > Subteam".
     function matchesFolder(project) {
-      if (!folderName && !folderId) {
+      if (!filterFolderId) {
         return true; // No folder filter
       }
 
@@ -60,13 +82,7 @@
         return false; // Project has no folder, but filter requires one
       }
 
-      if (folderId && projectFolder.id.primaryKey === folderId) {
-        return true;
-      }
-      if (folderName && projectFolder.name.toLowerCase() === folderName.toLowerCase()) {
-        return true;
-      }
-      return false;
+      return projectFolder.id.primaryKey === filterFolderId;
     }
 
     // Helper to check if project matches status filter
@@ -124,13 +140,13 @@
         }
       }
 
-      // Get folder info
+      // Get folder info (full path via getFolderPath from sharedUtils)
       let projectFolderId = null;
       let projectFolderName = null;
       try {
         if (project.parentFolder) {
           projectFolderId = project.parentFolder.id.primaryKey;
-          projectFolderName = project.parentFolder.name;
+          projectFolderName = getFolderPath(project.parentFolder);
         }
       } catch (e) {
         metadataErrorCount++;

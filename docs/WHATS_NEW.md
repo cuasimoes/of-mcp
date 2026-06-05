@@ -1,6 +1,25 @@
-# OmniFocus MCP Server - What's New (v1.31.0)
+# OmniFocus MCP Server - What's New (v1.32.0)
 
 > Summary of changes from Sprints 1-10 for AI assistants using this MCP server.
+
+## v1.32.0 Folder path disambiguation and server version fix
+
+**Folder path disambiguation:**
+- All tools accepting `folderName` now support `"Parent > Child"` path syntax to disambiguate folders with the same name at different hierarchy levels (e.g., `"Work > Areas"` vs `"Personal > Areas"`)
+- Plain folder names still work (first match, backwards compatible)
+- Affected tools: `get_folder_by_id`, `add_project`, `add_folder`, `edit_item`, `duplicate_project`, `batch_add_items`, `batch_edit_items`, `list_projects`
+
+**Full folder paths in output:**
+- `list_projects` now returns full folder paths (e.g., `"Work > Areas"`) instead of bare names (`"Areas"`)
+- `get_folder_by_id` now includes a `path` field in its response
+
+**Stricter folder filtering in `list_projects`:**
+- When a `folderName` filter doesn't resolve (typo, deleted folder, or an ambiguous name), `list_projects` now returns an explicit `Folder not found` error instead of silently returning *every* project. This matches the existing fail-closed behaviour of `add_project`, `duplicate_project`, and `get_folder_by_id`.
+
+**Server version fix:**
+- `get_server_version` no longer fails with ENOENT when the MCP server runs from a directory without a `package.json`
+
+---
 
 ## v1.31.0 Expose subtasks in get_task_by_id response
 
