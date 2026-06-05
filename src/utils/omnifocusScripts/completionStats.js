@@ -1,5 +1,5 @@
 // OmniJS script to get completion statistics grouped by project, tag, or folder
-// parseLocalDate is provided by sharedUtils.js
+// parseLocalDate and toLocalDateKey are provided by sharedUtils.js
 (() => {
   try {
     const args = typeof injectedArgs !== 'undefined' ? injectedArgs : {};
@@ -135,8 +135,8 @@
     return JSON.stringify({
       success: true,
       period: {
-        start: completedAfter ? completedAfter.toISOString().split('T')[0] : null,
-        end: completedBefore ? completedBefore.toISOString().split('T')[0] : null
+        start: toLocalDateKey(completedAfter),
+        end: toLocalDateKey(completedBefore)
       },
       groupBy: groupBy,
       totalCompleted: totalCompleted,

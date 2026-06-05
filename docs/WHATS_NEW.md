@@ -1,6 +1,15 @@
-# OmniFocus MCP Server - What's New (v1.32.0)
+# OmniFocus MCP Server - What's New (v1.32.1)
 
 > Summary of changes from Sprints 1-10 for AI assistants using this MCP server.
+
+## v1.32.1 Fix `get_completion_stats` period echo off-by-one for UTC+ users (#118)
+
+**`get_completion_stats` now echoes `period.start` / `period.end` as the correct local date for UTC+ users.**
+The script built the echoed range with `completedAfter.toISOString().split('T')[0]`. Because `completedAfter` / `completedBefore` are local-midnight `Date` objects from `parseLocalDate(...)`, `toISOString()` converts them back to UTC — in a UTC+10 environment, local midnight April 28 became `"2026-04-27"`, reporting the range a day early. The keys are now built from local year/month/date components via a shared `toLocalDateKey(date)` helper in `lib/sharedUtils.js`.
+
+**Display-only.** This affected only the echoed range in the response, not which tasks were counted — the completion-date comparisons use the `Date` objects directly and were always correct. Same bug class as the forecast fix in #114.
+
+---
 
 ## v1.32.0 Folder path disambiguation and server version fix
 

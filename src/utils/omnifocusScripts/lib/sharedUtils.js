@@ -67,6 +67,22 @@ function formatDate(date) {
 }
 
 /**
+ * Build a local YYYY-MM-DD date key from a Date.
+ * Uses local year/month/date components — toISOString() would convert to UTC,
+ * shifting the day for UTC+ users (see #114, #118).
+ * @param {Date|null|undefined} date - The date to format
+ * @returns {string|null} - Local date key (YYYY-MM-DD) or null if date is falsy
+ */
+function toLocalDateKey(date) {
+  if (!date) return null;
+  const d = new Date(date);
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+}
+
+/**
  * Build the full ancestor path for a folder (e.g. "Work > Projects > Active").
  * Walks up the parent chain. Returns the folder's own name if it has no parent.
  * @param {Folder} folder - An OmniFocus Folder object
