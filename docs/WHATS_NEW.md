@@ -13,6 +13,9 @@
 - `list_projects` now returns full folder paths (e.g., `"Work > Areas"`) instead of bare names (`"Areas"`)
 - `get_folder_by_id` now includes a `path` field in its response
 
+**Stricter folder filtering in `list_projects`:**
+- When a `folderName` filter doesn't resolve (typo, deleted folder, or an ambiguous name), `list_projects` now returns an explicit `Folder not found` error instead of silently returning *every* project. This matches the existing fail-closed behaviour of `add_project`, `duplicate_project`, and `get_folder_by_id`.
+
 **Server version fix:**
 - `get_server_version` no longer fails with ENOENT when the MCP server runs from a directory without a `package.json`
 

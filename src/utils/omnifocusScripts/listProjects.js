@@ -55,6 +55,20 @@
       : null;
     const filterFolderId = folderId || (resolvedFilterFolder ? resolvedFilterFolder.id.primaryKey : null);
 
+    // Fail closed: a folder filter was requested but didn't resolve (typo, deleted
+    // folder, or an ambiguous name). Return an explicit error rather than silently
+    // matching every project, which would look like a successful unfiltered result
+    // (issue #117 review). Matches add_project / duplicate_project / get_folder_by_id.
+    const folderFilterRequested = !!(folderId || folderName);
+    if (folderFilterRequested && !filterFolderId) {
+      return JSON.stringify({
+        success: false,
+        error: `Folder not found: "${folderName}". Use "Parent > Child" to disambiguate folders that share a name.`,
+        count: 0,
+        projects: []
+      });
+    }
+
     // Helper to check if project matches folder filter.
     // Intentionally shallow: only matches direct parent, not nested subfolders.
     // Filtering by "Work" will not include projects in "Work > Subteam".
