@@ -1,6 +1,7 @@
 import { executeOmniFocusScript } from '../../utils/scriptExecution.js';
 import { queryCache } from '../../utils/cache.js';
 import { logger } from '../../utils/logger.js';
+import { ProcessingErrors } from '../../utils/formatUtils.js';
 
 const log = logger.child('getTaskById');
 
@@ -10,11 +11,26 @@ export interface GetTaskByIdParams {
   taskName?: string;
 }
 
+export interface ChildTaskSummary {
+  id: string;
+  name: string;
+  completed: boolean;
+  dropped: boolean;
+  flagged: boolean;
+  dueDate?: string | null;
+  deferDate?: string | null;
+  hasChildren: boolean;
+  childrenCount: number;
+}
+
 // Interface for task information result
 export interface TaskInfo {
   id: string;
   name: string;
   note: string;
+  completed: boolean;
+  dropped: boolean;
+  flagged: boolean;
   dueDate?: string | null;
   deferDate?: string | null;
   plannedDate?: string | null;
@@ -24,8 +40,10 @@ export interface TaskInfo {
   projectName?: string;
   hasChildren: boolean;
   childrenCount: number;
+  children?: ChildTaskSummary[];
+  childrenError?: string;
   createdDate?: string | null;
-  repetitionRule?: string | null; // iCal RRULE string representation
+  repetitionRule?: string | null;
   isRepeating?: boolean;
 }
 
@@ -33,7 +51,7 @@ export interface TaskInfo {
  * Get task information by ID or name from OmniFocus
  * Uses OmniJS to avoid AppleScript escaping issues with special characters like $
  */
-export async function getTaskById(params: GetTaskByIdParams): Promise<{success: boolean, task?: TaskInfo, error?: string}> {
+export async function getTaskById(params: GetTaskByIdParams): Promise<{success: boolean, task?: TaskInfo, processingErrors?: ProcessingErrors, error?: string}> {
   try {
     // Validate parameters
     if (!params.taskId && !params.taskName) {
@@ -49,7 +67,7 @@ export async function getTaskById(params: GetTaskByIdParams): Promise<{success: 
     };
 
     // Check cache first (getWithChecksum returns checksum for race-condition-free set)
-    type CacheResult = {success: boolean, task?: TaskInfo, error?: string};
+    type CacheResult = {success: boolean, task?: TaskInfo, processingErrors?: ProcessingErrors, error?: string};
     const { data: cached, checksum } = await queryCache.getWithChecksum<CacheResult>('getTaskById', scriptParams);
     if (cached) {
       log.debug('Using cached result');
@@ -77,9 +95,20 @@ export async function getTaskById(params: GetTaskByIdParams): Promise<{success: 
       parsed = result;
     }
 
-    const response: CacheResult = parsed.success
-      ? { success: true, task: parsed.task as TaskInfo }
-      : { success: false, error: parsed.error || "Unknown error" };
+    if (parsed.success && parsed.processingErrors) {
+      log.warn('getTaskById returned processing errors', parsed.processingErrors);
+    }
+
+    let response: CacheResult;
+    if (parsed.success) {
+      const task = parsed.task as TaskInfo;
+      if (!Array.isArray(task.children)) {
+        task.children = [];
+      }
+      response = { success: true, task, processingErrors: parsed.processingErrors };
+    } else {
+      response = { success: false, error: parsed.error || "Unknown error" };
+    }
 
     // Cache the result with the same checksum used for validation
     await queryCache.set('getTaskById', scriptParams, response, checksum);

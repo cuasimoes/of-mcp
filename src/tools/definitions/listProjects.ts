@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { listProjects } from '../primitives/listProjects.js';
 import { formatDateSafe } from '../../utils/dateUtils.js';
+import { formatProcessingWarnings } from '../../utils/formatUtils.js';
 
 export const schema = z.object({
   folderName: z.string().optional().describe("Filter by folder name"),
@@ -67,6 +68,10 @@ export async function handler(
         output += `- ${project.name}: \`${project.id}\`\n`;
       }
     }
+
+    // Surface any optional-field read failures (issue #110)
+    const warnings = formatProcessingWarnings(result.processingErrors);
+    if (warnings) output += `\n${warnings}`;
 
     return {
       content: [{

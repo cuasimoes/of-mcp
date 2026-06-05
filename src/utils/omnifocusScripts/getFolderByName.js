@@ -5,6 +5,11 @@
     const folderId = args.folderId || null;
     const folderName = args.folderName || null;
 
+    // Track optional-field read failures instead of swallowing them silently (issue #110)
+    const MAX_ERROR_SAMPLES = 3;
+    let metadataErrorCount = 0;
+    const errorSamples = [];
+
     if (!folderId && !folderName) {
       return JSON.stringify({
         success: false,
@@ -65,7 +70,10 @@
         ).length;
       }
     } catch (e) {
-      // Project count not accessible
+      metadataErrorCount++;
+      if (errorSamples.length < MAX_ERROR_SAMPLES) {
+        errorSamples.push(`projectCount(${foundFolder.name || 'unknown'}): ${e.message || String(e)}`);
+      }
     }
 
     // Get subfolder count
@@ -74,17 +82,23 @@
         folderInfo.subfolderCount = foundFolder.folders.length;
       }
     } catch (e) {
-      // Subfolder count not accessible
+      metadataErrorCount++;
+      if (errorSamples.length < MAX_ERROR_SAMPLES) {
+        errorSamples.push(`subfolderCount(${foundFolder.name || 'unknown'}): ${e.message || String(e)}`);
+      }
     }
 
-    // Get parent folder info and full path
+    // Get parent folder info (Folder.parent is itself a Folder, or null for top-level folders)
     try {
-      if (foundFolder.parent && foundFolder.parent.folder) {
+      if (foundFolder.parent) {
         folderInfo.parentFolderId = foundFolder.parent.id.primaryKey;
         folderInfo.parentFolderName = foundFolder.parent.name;
       }
     } catch (e) {
-      // Parent folder not accessible
+      metadataErrorCount++;
+      if (errorSamples.length < MAX_ERROR_SAMPLES) {
+        errorSamples.push(`parentFolder(${foundFolder.name || 'unknown'}): ${e.message || String(e)}`);
+      }
     }
 
     try {
@@ -93,10 +107,14 @@
       folderInfo.path = foundFolder.name;
     }
 
-    return JSON.stringify({
+    const result = {
       success: true,
       folder: folderInfo
-    });
+    };
+    if (metadataErrorCount > 0) {
+      result.processingErrors = { metadataErrors: metadataErrorCount, samples: errorSamples };
+    }
+    return JSON.stringify(result);
 
   } catch (error) {
     return JSON.stringify({

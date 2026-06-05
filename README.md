@@ -575,7 +575,7 @@ get_project_by_id {
 6. **batch_add_items** - Bulk add tasks/projects (true batching - 9x faster)
 7. **batch_edit_items** - Bulk edit tasks/projects (true batching - 12x faster)
 8. **batch_remove_items** - Bulk remove (true batching - 9x faster)
-9. **get_task_by_id** - Query task information
+9. **get_task_by_id** - Query task information (includes subtasks with status, flags, and nesting depth)
 10. **list_projects** - List projects with folder/status filtering
 
 ### 🔍 Built-in Perspective Tools

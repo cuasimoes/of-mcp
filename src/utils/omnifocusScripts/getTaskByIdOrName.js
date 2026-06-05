@@ -6,6 +6,11 @@
     const taskId = args.taskId || null;
     const taskName = args.taskName || null;
 
+    // Track optional-field read failures instead of swallowing them silently (issue #110)
+    const MAX_ERROR_SAMPLES = 3;
+    let metadataErrorCount = 0;
+    const errorSamples = [];
+
     if (!taskId && !taskName) {
       return JSON.stringify({
         success: false,
@@ -57,8 +62,9 @@
       plannedDate: foundTask.plannedDate ? foundTask.plannedDate.toISOString() : null,
       estimatedMinutes: foundTask.estimatedMinutes || null,
       createdDate: foundTask.added ? foundTask.added.toISOString() : null,
-      hasChildren: foundTask.hasChildren,
-      childrenCount: foundTask.children ? foundTask.children.length : 0,
+      children: [],
+      hasChildren: false,
+      childrenCount: 0,
       parentId: null,
       parentName: null,
       projectId: null,
@@ -68,14 +74,42 @@
       isRepeating: foundTask.repetitionRule !== null
     };
 
-    // Get parent info
+    // Build children list (one level of direct subtasks)
     try {
-      if (foundTask.parent && foundTask.parent.task) {
+      if (foundTask.children && foundTask.children.length > 0) {
+        taskInfo.children = foundTask.children.map(child => ({
+          id: child.id.primaryKey,
+          name: child.name,
+          completed: child.taskStatus === Task.Status.Completed,
+          dropped: child.taskStatus === Task.Status.Dropped,
+          flagged: child.flagged,
+          dueDate: child.dueDate ? child.dueDate.toISOString() : null,
+          deferDate: child.deferDate ? child.deferDate.toISOString() : null,
+          hasChildren: child.hasChildren,
+          childrenCount: child.children ? child.children.length : 0
+        }));
+      }
+    } catch (e) {
+      taskInfo.childrenError = `Could not load subtasks: ${e}`;
+    }
+    // Source hasChildren/childrenCount from the task itself rather than the built list,
+    // so a subtask-load failure leaves children:[] + childrenError set without making a
+    // task that has children report as childless.
+    taskInfo.hasChildren = foundTask.hasChildren;
+    taskInfo.childrenCount = foundTask.children ? foundTask.children.length : 0;
+
+    // Get parent info. A top-level task's parent is the project's root task
+    // (whose .project is truthy); only report a genuine subtask's parent here.
+    try {
+      if (foundTask.parent && !foundTask.parent.project) {
         taskInfo.parentId = foundTask.parent.id.primaryKey;
         taskInfo.parentName = foundTask.parent.name;
       }
     } catch (e) {
-      // Parent not accessible
+      metadataErrorCount++;
+      if (errorSamples.length < MAX_ERROR_SAMPLES) {
+        errorSamples.push(`parent(${foundTask.name || 'unknown'}): ${e.message || String(e)}`);
+      }
     }
 
     // Get project info
@@ -85,7 +119,10 @@
         taskInfo.projectName = foundTask.containingProject.name;
       }
     } catch (e) {
-      // Project not accessible
+      metadataErrorCount++;
+      if (errorSamples.length < MAX_ERROR_SAMPLES) {
+        errorSamples.push(`project(${foundTask.name || 'unknown'}): ${e.message || String(e)}`);
+      }
     }
 
     // Get tags
@@ -97,13 +134,20 @@
         }));
       }
     } catch (e) {
-      // Tags not accessible
+      metadataErrorCount++;
+      if (errorSamples.length < MAX_ERROR_SAMPLES) {
+        errorSamples.push(`tags(${foundTask.name || 'unknown'}): ${e.message || String(e)}`);
+      }
     }
 
-    return JSON.stringify({
+    const result = {
       success: true,
       task: taskInfo
-    });
+    };
+    if (metadataErrorCount > 0) {
+      result.processingErrors = { metadataErrors: metadataErrorCount, samples: errorSamples };
+    }
+    return JSON.stringify(result);
 
   } catch (error) {
     return JSON.stringify({
