@@ -1,6 +1,16 @@
-# OmniFocus MCP Server - What's New (v1.32.1)
+# OmniFocus MCP Server - What's New (v1.32.2)
 
 > Summary of changes from Sprints 1-10 for AI assistants using this MCP server.
+
+## v1.32.2 Harden TS date parsing: shared `parseLocalDate` helper + timezone unit tests (#119)
+
+**Internal hardening, no behaviour change for users.** Follow-up to #114.
+
+The bare-`YYYY-MM-DD` → local-`Date` parsing that #114 added inline in two TypeScript spots (`formatDateSafe` and the forecast classifier) is now consolidated into a single exported `parseLocalDate(dateString)` in `src/utils/dateUtils.ts` — the TS-side parallel to the OmniJS `parseLocalDate()` in `lib/sharedUtils.js`, hardened to return `null` for missing or invalid input. `formatDateSafe` now delegates to it, and the forecast TODAY/TOMORROW/OVERDUE/FUTURE bucketing is extracted into a pure, testable `classifyForecastDate(dateString, now)`.
+
+**First automated tests.** `npm test` now runs a timezone unit suite (`tests/dateUtils.test.mjs`, Node's built-in `node:test`, no new dependencies) that exercises the bare-date path under both a UTC− zone (`America/Los_Angeles`) and a UTC+ zone (`Australia/Sydney`), asserting cross-zone invariance rather than a locale-specific string. This locks in the #114 fix and the invalid-date guard added during its review, which were previously invisible to any UTC-based run. The OmniFocus integration scripts (`tests/test-*.mjs`) remain manual.
+
+---
 
 ## v1.32.1 Fix `get_completion_stats` period echo off-by-one for UTC+ users (#118)
 
