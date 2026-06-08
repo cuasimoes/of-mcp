@@ -42,16 +42,16 @@ export async function getForecastTasks(options: GetForecastTasksOptions = {}): P
         if (dates.length === 0) {
           output += "🎉 No tasks due in the forecast period - enjoy the calm!\n";
         } else {
-          const today = new Date();
-          today.setHours(0, 0, 0, 0);
-          
+          const now = new Date();
+          let totalTasks = 0;
+
           dates.forEach(dateStr => {
             const tasks = data.tasksByDate[dateStr];
             if (!tasks || tasks.length === 0) return;
 
             const taskDate = parseLocalDate(dateStr);
-            const category = classifyForecastDate(dateStr, today);
-            if (!taskDate || !category) return; // skip unparseable forecast keys
+            if (!taskDate) return; // skip unparseable forecast keys
+            const category = classifyForecastDate(taskDate, now);
 
             let dateHeader = '';
             if (category === 'OVERDUE') {
@@ -81,12 +81,12 @@ export async function getForecastTasks(options: GetForecastTasksOptions = {}): P
                 output += `  📝 ${task.note.trim()}\n`;
               }
             });
-            
+
+            totalTasks += tasks.length; // count only dates we actually rendered
             output += '\n';
           });
-          
+
           // Summary
-          const totalTasks = dates.reduce((sum, date) => sum + data.tasksByDate[date].length, 0);
           output += `📊 **Summary**: ${totalTasks} task${totalTasks === 1 ? '' : 's'} in forecast\n`;
         }
       } else {

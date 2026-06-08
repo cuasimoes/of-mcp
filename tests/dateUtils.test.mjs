@@ -9,7 +9,9 @@
 // rather than pinning a locale-specific string (which would itself be the same
 // class of bug this suite exists to catch).
 //
-// Imports the compiled output, matching the other tests/*.mjs scripts.
+// Run via `npm test` (alias for test:unit): esbuild bundles dateUtils.ts to
+// dist/test-build/dateUtils.mjs first, then node:test runs this file. Invoking
+// `node --test` on this file directly fails until that bundle exists.
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -18,7 +20,7 @@ import {
   parseLocalDate,
   formatDateSafe,
   classifyForecastDate,
-} from '../dist/utils/dateUtils.js';
+} from '../dist/test-build/dateUtils.mjs';
 
 const UTC_MINUS = 'America/Los_Angeles';
 const UTC_PLUS = 'Australia/Sydney';
@@ -36,32 +38,41 @@ function withTZ(zone, fn) {
   }
 }
 
-test('classifyForecastDate: today key classifies as TODAY in both zones', () => {
+// classifyForecastDate takes a Date; forecast keys reach it via parseLocalDate
+// (which is the timezone-sensitive step). This mirrors how getForecastTasks calls it.
+const classifyKey = (key, now) => classifyForecastDate(parseLocalDate(key), now);
+
+test('classifyForecastDate: a date key lands in the right bucket in both zones', () => {
   for (const zone of [UTC_MINUS, UTC_PLUS]) {
     withTZ(zone, () => {
       // A fixed local "now" keeps this deterministic regardless of the wall clock.
       const now = new Date(2026, 3, 28, 23, 30); // local 2026-04-28 23:30
-      assert.equal(classifyForecastDate('2026-04-28', now), 'TODAY', `zone=${zone}`);
-      assert.equal(classifyForecastDate('2026-04-27', now), 'OVERDUE', `zone=${zone}`);
-      assert.equal(classifyForecastDate('2026-04-29', now), 'TOMORROW', `zone=${zone}`);
-      assert.equal(classifyForecastDate('2026-05-10', now), 'FUTURE', `zone=${zone}`);
+      assert.equal(classifyKey('2026-04-28', now), 'TODAY', `zone=${zone}`);
+      assert.equal(classifyKey('2026-04-27', now), 'OVERDUE', `zone=${zone}`);
+      assert.equal(classifyKey('2026-04-29', now), 'TOMORROW', `zone=${zone}`);
+      assert.equal(classifyKey('2026-05-10', now), 'FUTURE', `zone=${zone}`);
     });
   }
 });
 
-test('classifyForecastDate: malformed key returns null', () => {
-  assert.equal(classifyForecastDate('2026-13-45', new Date(2026, 3, 28)), null);
+test('classifyForecastDate: TOMORROW survives DST transitions (America/Los_Angeles)', () => {
+  withTZ(UTC_MINUS, () => {
+    // Spring forward: 2026-03-08 is a 23-hour local day, so next-midnight is +23h.
+    assert.equal(classifyKey('2026-03-09', new Date(2026, 2, 8, 12, 0)), 'TOMORROW', 'spring forward');
+    // Fall back: 2026-11-01 is a 25-hour local day, so next-midnight is +25h.
+    assert.equal(classifyKey('2026-11-02', new Date(2026, 10, 1, 12, 0)), 'TOMORROW', 'fall back');
+  });
 });
 
-test('formatDateSafe: bare date renders the same day in both zones', () => {
+test('formatDateSafe: bare date renders as local Apr 28 in both zones', () => {
+  // Locale-robust: compare against the locale's own rendering of local Apr 28,
+  // not a hard-coded "28", so the assertion holds under any locale/digit system.
+  const expected = withTZ(UTC_MINUS, () => new Date(2026, 3, 28).toLocaleDateString());
   const la = withTZ(UTC_MINUS, () => formatDateSafe('2026-04-28'));
   const syd = withTZ(UTC_PLUS, () => formatDateSafe('2026-04-28'));
 
-  // Invariance: a bare date must display identically regardless of zone...
-  assert.equal(la, syd);
-  // ...and must be the 28th, not slipped back to the 27th.
-  assert.match(la, /\b28\b/);
-  assert.ok(!/\b27\b/.test(la), `unexpected day slip: ${la}`);
+  assert.equal(la, syd);      // zone-invariant
+  assert.equal(la, expected); // local Apr 28, not slipped back to the 27th
 });
 
 test('formatDateSafe: full ISO string still uses the general (fallback) path', () => {
@@ -96,6 +107,14 @@ test('parseLocalDate: full ISO string parses via Date constructor', () => {
   const d = parseLocalDate('2026-04-28T07:30:00Z');
   assert.ok(d instanceof Date);
   assert.equal(d.getTime(), new Date('2026-04-28T07:30:00Z').getTime());
+});
+
+test('parseLocalDate: years 0-99 round-trip (no 1900s mapping)', () => {
+  const d = parseLocalDate('0099-01-01');
+  assert.ok(d instanceof Date);
+  assert.equal(d.getFullYear(), 99); // not 1999
+  assert.equal(d.getMonth(), 0);
+  assert.equal(d.getDate(), 1);
 });
 
 test('parseLocalDate: well-shaped but invalid dates return null', () => {

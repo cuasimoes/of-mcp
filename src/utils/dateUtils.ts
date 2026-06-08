@@ -15,6 +15,9 @@
  * This is the TypeScript-side parallel to `parseLocalDate()` in
  * `lib/sharedUtils.js` (the OmniJS helper, which is not importable from TS),
  * hardened to return `null` for unparseable input so callers can fail safely.
+ * NOTE: the OmniJS twin is NOT yet hardened (it rolls invalid dates forward and
+ * would throw on null) — keep the two in sync when changing parsing rules; #133
+ * tracks making the OmniJS side testable and hardened.
  *
  * @param dateString - ISO date string (YYYY-MM-DD or full ISO), or null/undefined
  * @returns A local-time Date, or null if the input is missing or invalid
@@ -26,6 +29,9 @@ export function parseLocalDate(dateString: string | null | undefined): Date | nu
   if (bareDate) {
     const [, y, m, d] = bareDate.map(Number);
     const date = new Date(y, m - 1, d);
+    // new Date(0..99, ...) maps to years 1900..1999; force the literal year so
+    // dates in years 0-99 round-trip instead of being rejected by the guard below.
+    if (y < 100) date.setFullYear(y);
     // new Date(y, m-1, d) silently rolls overflow forward (month 13 -> next year,
     // day 45 -> next month), so a well-shaped but invalid string like "2026-13-45"
     // would yield a bogus date that isNaN can't catch. Reject anything that doesn't
@@ -58,29 +64,34 @@ export function formatDateSafe(dateString: string | null | undefined): string | 
 export type ForecastDateCategory = 'OVERDUE' | 'TODAY' | 'TOMORROW' | 'FUTURE';
 
 /**
- * Classify a forecast date key (bare `YYYY-MM-DD`) relative to a reference time.
+ * Classify a (local-time) date relative to a reference time, by calendar day.
  *
- * The key is parsed as local time (via {@link parseLocalDate}) so that "today"
- * is judged against the viewer's local day, not UTC — otherwise a date due today
- * would classify as OVERDUE for UTC- viewers. Returns null if the key cannot be
- * parsed.
+ * Both `date` and `now` are reduced to their local calendar day before
+ * comparison, so a task due today classifies as TODAY for the viewer's local day
+ * regardless of timezone. TOMORROW uses calendar arithmetic (not a fixed +24h) so
+ * it stays correct across DST transitions, where a local day is 23h or 25h long.
+ * Parse bare `YYYY-MM-DD` keys with {@link parseLocalDate} (as the callers do) so
+ * they land on local midnight.
  *
- * @param dateString - Forecast date key in `YYYY-MM-DD` form
+ * @param date - The date to classify (only its local calendar day matters)
  * @param now - Reference time (defaults to the current time)
- * @returns The forecast category, or null if the key is invalid
+ * @returns The forecast category
  */
 export function classifyForecastDate(
-  dateString: string,
+  date: Date,
   now: Date = new Date()
-): ForecastDateCategory | null {
-  const date = parseLocalDate(dateString);
-  if (!date) return null;
-
+): ForecastDateCategory {
   const today = new Date(now);
   today.setHours(0, 0, 0, 0);
 
-  if (date.getTime() === today.getTime()) return 'TODAY';
-  if (date.getTime() === today.getTime() + 24 * 60 * 60 * 1000) return 'TOMORROW';
-  if (date < today) return 'OVERDUE';
+  const tomorrow = new Date(today);
+  tomorrow.setDate(today.getDate() + 1); // calendar arithmetic — DST-safe, unlike +24h
+
+  const day = new Date(date);
+  day.setHours(0, 0, 0, 0);
+
+  if (day.getTime() === today.getTime()) return 'TODAY';
+  if (day.getTime() === tomorrow.getTime()) return 'TOMORROW';
+  if (day < today) return 'OVERDUE';
   return 'FUTURE';
 }
