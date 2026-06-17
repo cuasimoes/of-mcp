@@ -4,6 +4,13 @@
 /**
  * Parse date strings as local time.
  * Fixes issue where "2026-02-04" would be interpreted as midnight UTC.
+ *
+ * Twin of the hardened TypeScript `parseLocalDate()` in `src/utils/dateUtils.ts`.
+ * This OmniJS copy is intentionally separate (it is prepended into the OmniFocus
+ * runtime and is not importable from TS). Unlike the TS version it does NOT reject
+ * well-shaped-but-invalid dates (e.g. "2026-13-45" rolls forward) and would throw
+ * on null — #133 tracks hardening + testing this side. Keep the two in sync.
+ *
  * @param {string} dateStr - Date string in ISO format (YYYY-MM-DD or full ISO)
  * @returns {Date} - Date object in local timezone
  */

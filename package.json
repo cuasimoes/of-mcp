@@ -1,7 +1,7 @@
 {
   "name": "of-mcp",
   "type": "module",
-  "version": "1.32.1",
+  "version": "1.32.2",
   "description": "MCP server for OmniFocus with batch operations, custom perspectives, hierarchical tasks, and comprehensive task management",
   "main": "dist/server.js",
   "bin": {
@@ -14,7 +14,8 @@
     "start": "node dist/server.js",
     "dev": "tsc -w",
     "prepublishOnly": "npm run build",
-    "test": "echo \"Test passed - manual testing required with OmniFocus\""
+    "test": "npm run test:unit",
+    "test:unit": "esbuild src/utils/dateUtils.ts --bundle --outfile=dist/test-build/dateUtils.mjs --format=esm --platform=node && node --test tests/*.test.mjs"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.8.0",

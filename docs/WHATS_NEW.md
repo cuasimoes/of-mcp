@@ -1,6 +1,18 @@
-# OmniFocus MCP Server - What's New (v1.32.1)
+# OmniFocus MCP Server - What's New (v1.32.2)
 
 > Summary of changes from Sprints 1-10 for AI assistants using this MCP server.
+
+## v1.32.2 Harden TS date parsing: shared `parseLocalDate` helper + timezone unit tests (#119)
+
+Follow-up to #114 — internal hardening plus one small forecast display fix.
+
+The bare-`YYYY-MM-DD` → local-`Date` parsing that #114 added inline in two TypeScript spots (`formatDateSafe` and the forecast classifier) is now consolidated into a single exported `parseLocalDate(dateString)` in `src/utils/dateUtils.ts` — the TS-side parallel to the OmniJS `parseLocalDate()` in `lib/sharedUtils.js`, hardened to return `null` for missing or invalid input (and to round-trip years 0–99 rather than mapping them to the 1900s). `formatDateSafe` now delegates to it, and the forecast OVERDUE/TODAY/TOMORROW/FUTURE bucketing is extracted into a pure, testable `classifyForecastDate(date, now)`.
+
+**Forecast fix:** `classifyForecastDate` now uses calendar arithmetic for "tomorrow" instead of a fixed `+24h`, so on the two daylight-saving transition days a year the day after the change is again labelled `⏰ TOMORROW` rather than a plain weekday header. The forecast summary count also reflects only the dates actually rendered.
+
+**First automated tests.** `npm test` runs a timezone unit suite (`tests/dateUtils.test.mjs`, Node's built-in `node:test`, no new dependencies) that exercises the bare-date path under both a UTC− zone (`America/Los_Angeles`) and a UTC+ zone (`Australia/Sydney`), asserting cross-zone (and DST-transition) invariance rather than locale-specific strings. It builds the one pure module under test with esbuild, since the full `tsc` build is known to hang on some setups (see `build:fast`). This locks in the #114 fix and the invalid-date guard added during its review, which were previously invisible to any UTC-based run. The OmniFocus integration scripts (`tests/test-*.mjs`) remain manual.
+
+---
 
 ## v1.32.1 Fix `get_completion_stats` period echo off-by-one for UTC+ users (#118)
 

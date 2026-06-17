@@ -14,8 +14,15 @@ npm run dev
 # Start the server
 npm run start
 
-# Test (manual testing required with OmniFocus)
-npm run test
+# Run the automated unit tests
+# (esbuild-transpiles the pure date utils, then runs node:test; no full tsc
+#  build or OmniFocus needed — esbuild is used because the full tsc build is
+#  known to hang/OOM on some systems, see build:fast)
+npm test
+
+# OmniFocus integration scripts (tests/test-*.mjs) still require manual runs
+# against a live OmniFocus, e.g.:
+node tests/test-review-feature.mjs
 ```
 
 The build process compiles TypeScript to JavaScript and copies OmniJS script files to the dist directory.
