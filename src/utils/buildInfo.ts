@@ -50,14 +50,18 @@ function resolveRepoRoot(): string | null {
   // Mirrors getServerVersion's package.json resolution: works for the esbuild
   // bundle (dist/server.js -> ../package.json) and tsc output
   // (dist/utils/buildInfo.js -> ../../package.json).
-  const here = dirname(fileURLToPath(import.meta.url));
-  const candidates = [
-    join(here, '..', 'package.json'),
-    join(here, '..', '..', 'package.json'),
-    join(here, '..', '..', '..', 'package.json'),
-  ];
-  const found = candidates.find(p => existsSync(p));
-  return found ? dirname(found) : null;
+  try {
+    const here = dirname(fileURLToPath(import.meta.url));
+    const candidates = [
+      join(here, '..', 'package.json'),
+      join(here, '..', '..', 'package.json'),
+      join(here, '..', '..', '..', 'package.json'),
+    ];
+    const found = candidates.find(p => existsSync(p));
+    return found ? dirname(found) : null;
+  } catch {
+    return null;
+  }
 }
 
 function hashBundle(repoRoot: string | null): string | null {

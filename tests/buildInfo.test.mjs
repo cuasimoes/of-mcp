@@ -48,6 +48,17 @@ test('shapeBuildBlock: no stamp but bundle present still detects process-behind-
   assert.equal(block.buildStale, true);
 });
 
+test('shapeBuildBlock: stamp present with null contentHash + matching hashes -> fresh', () => {
+  const block = shapeBuildBlock({
+    raw: { commit: 'abc1234', dirty: false, contentHash: null },
+    loadedHash: 'sha256-aaa',
+    currentHash: 'sha256-aaa',
+  });
+  assert.deepEqual(block, {
+    commit: 'abc1234', dirty: false, contentHash: null, buildStale: false,
+  });
+});
+
 test('shapeBuildBlock: process behind disk is flagged stale', () => {
   const block = shapeBuildBlock({
     raw: { commit: 'abc1234', dirty: true, contentHash: 'sha256-aaa' },

@@ -4,7 +4,7 @@
 
 ## v1.33.0 Build-staleness gate: `get_server_version` reports build provenance (#126)
 
-`get_server_version` now returns a `build` object alongside the version string: `commit` (short SHA baked in at build time), `dirty` (whether the working tree had uncommitted changes), `contentHash` (a hash of compiled output), and `buildStale` (true when the running process was launched from an older build than what is currently on disk).
+`get_server_version` now returns a `build` object alongside the version string: `commit` (short SHA baked in at build time), `dirty` (whether the working tree had uncommitted or untracked changes), `contentHash` (a hash of compiled output), and `buildStale` (true when the running process was launched from an older build than what is currently on disk).
 
 A matching version number is no longer sufficient evidence that the right code is running. `buildStale: true` signals that the server process predates the on-disk build and needs a restart. `buildStale: false` confirms the process matches the disk build, but you still need to compare `build.commit` against `git rev-parse --short HEAD` to confirm the disk build itself came from the intended source.
 

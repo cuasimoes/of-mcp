@@ -3,7 +3,7 @@
 // report which build the running process loaded (issue #126). Run as a
 // post-compile step in `build` and `build:fast`.
 import { execFileSync } from 'node:child_process';
-import { readFileSync, writeFileSync } from 'node:fs';
+import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { createHash } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
@@ -25,7 +25,7 @@ const commit = git(['rev-parse', '--short', 'HEAD']) ?? 'unknown';
 // dist/ is gitignored, so a rebuild never shows in `git status --porcelain`;
 // a non-empty status therefore means uncommitted source changes.
 const status = git(['status', '--porcelain']);
-const dirty = status === null ? null : status.trim().length > 0;
+const dirty = status === null ? null : status.length > 0;
 
 let contentHash = null;
 try {
@@ -35,5 +35,6 @@ try {
 }
 
 const buildInfo = { commit, dirty, contentHash };
+mkdirSync(distDir, { recursive: true });
 writeFileSync(join(distDir, 'build-info.json'), JSON.stringify(buildInfo, null, 2) + '\n');
 console.log(`write-build-info: dist/build-info.json (${commit}${dirty ? ', dirty' : ''})`);

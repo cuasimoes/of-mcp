@@ -14,7 +14,7 @@ Before this change, verifying that the running MCP server matched the intended c
 The fix is a three-layer build-freshness gate implemented via the `build` block returned by `get_server_version`, which now surfaces three independent checks:
 1. **Disk-behind-source**: detects uncommitted edits by comparing mtime of changed `src/*.ts` files against `dist/server.js`.
 2. **Wrong/old committed build**: detects branch mismatch by comparing `build.commit` (SHA from committed `dist/build-info.json`) against `git rev-parse --short HEAD`.
-3. **Process-behind-disk**: detects unstarted/restarted process by comparing `build.buildStale` against whether the running bundle hash matches the disk build.
+3. **Process-behind-disk**: detects a process that loaded an older build than what is now on disk by comparing `build.buildStale` against whether the running bundle hash matches the disk build.
 
 The three failure modes are operationally distinct—a single check misses categories of staleness. Only when all three pass can you trust that the running code is the intended code. The version number alone is informational; the `build` object's three fields are the real gate.
 
@@ -26,7 +26,7 @@ The three failure modes are operationally distinct—a single check misses categ
    ```bash
    cd /Users/mojen/dev/of-mcp
    git checkout emdash/feat-build-staleness-gate
-   npm run build
+   npm run build:fast
    ```
 2. **Point your MCP client at this build** (`dist/server.js` in this repo) and **restart the session** so it loads the new build. Schema changes live in the TypeScript layer, so a server restart is required — `.js` script hot-reload alone is not enough.
 3. Have OmniFocus running with your normal database.
@@ -72,7 +72,7 @@ After building and restarting, confirm the running code is fresh with these thre
 - `build.buildStale` is `false` (meaning the running process matches the disk build; `true` would mean restart is needed).
 - All three Build freshness gate checks above pass.
 
-**Pass criteria:** the running server provably matches both the current source and the current process state.
+**Pass criteria:** the running server provably matches the current committed build and the process loaded from disk — verified via all three freshness-gate checks, including the source mtime check.
 
 - [ ] **PASS** — all three fields correct; Build freshness gate checks pass
 - [ ] **FAIL** — version mismatch, `build.commit` mismatch, `build.buildStale === true`, or freshness gate check fails (record output and which check failed)
