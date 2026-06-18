@@ -1,6 +1,6 @@
 # Smoke Test — Issue #126 (Build freshness gate for `get_server_version`)
 
-**Branch:** `emdash/feat-build-staleness-gate`
+**Branch:** `emdash/test-get-server-version-alone-sufficient-evidence-fresh-m80ic`
 **Version under test:** `1.33.0`
 **Tool affected:** `get_server_version` (returns `build.buildStale` and `build.commit` fields)
 **Run in:** a Claude Code (or other MCP client) session connected to **OmniFocus** on macOS.
@@ -13,7 +13,7 @@ Before this change, verifying that the running MCP server matched the intended c
 
 The fix is a three-layer build-freshness gate implemented via the `build` block returned by `get_server_version`, which now surfaces three independent checks:
 1. **Disk-behind-source**: detects uncommitted edits by comparing mtime of changed `src/*.ts` files against `dist/server.js`.
-2. **Wrong/old committed build**: detects branch mismatch by comparing `build.commit` (SHA from committed `dist/build-info.json`) against `git rev-parse --short HEAD`.
+2. **Wrong/old committed build**: detects branch mismatch by comparing `build.commit` (the short SHA the build records in `dist/build-info.json`, a gitignored artifact regenerated on every build) against `git rev-parse --short HEAD`.
 3. **Process-behind-disk**: detects a process that loaded an older build than what is now on disk by comparing `build.buildStale` against whether the running bundle hash matches the disk build.
 
 The three failure modes are operationally distinct—a single check misses categories of staleness. Only when all three pass can you trust that the running code is the intended code. The version number alone is informational; the `build` object's three fields are the real gate.
@@ -25,7 +25,7 @@ The three failure modes are operationally distinct—a single check misses categ
 1. **Build this branch** so the MCP server runs v1.33.0:
    ```bash
    cd /Users/mojen/dev/of-mcp
-   git checkout emdash/feat-build-staleness-gate
+   git checkout emdash/test-get-server-version-alone-sufficient-evidence-fresh-m80ic
    npm run build:fast
    ```
 2. **Point your MCP client at this build** (`dist/server.js` in this repo) and **restart the session** so it loads the new build. Schema changes live in the TypeScript layer, so a server restart is required — `.js` script hot-reload alone is not enough.
