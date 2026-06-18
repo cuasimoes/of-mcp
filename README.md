@@ -824,8 +824,12 @@ Use batch tools for multiple write operations:
 # Check MCP status
 claude mcp list
 
-# Verify server version
+# Verify server version (returns version + build provenance block)
 get_server_version
+# Response includes a `build` object: { commit, dirty, contentHash, buildStale }
+# buildStale: true  → running process predates the on-disk build; restart the server
+# To confirm you are also on the right source, compare build.commit with:
+#   git rev-parse --short HEAD   (buildStale alone only proves process = disk)
 
 # Test basic connection
 get_inbox_tasks
@@ -873,7 +877,7 @@ filter_tasks {
 - Verify Node.js 18+ is installed
 - Check Claude Code MCP configuration
 - Enable accessibility permissions for terminal apps if needed
-- Use `get_server_version` to verify the correct version is loaded after updates
+- Use `get_server_version` to verify the correct version is loaded after updates. The response now includes a `build` object (`commit`, `dirty`, `contentHash`, `buildStale`). `buildStale: true` means the running process predates the on-disk build — restart the server to clear it. Note that `buildStale: false` only proves the process matches the on-disk build; to confirm you are on the intended source, also compare `build.commit` against `git rev-parse --short HEAD`.
 
 ## 🎯 Use Cases
 
