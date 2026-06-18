@@ -4,6 +4,7 @@ import { ServerRequest, ServerNotification } from '@modelcontextprotocol/sdk/typ
 import { readFileSync, existsSync } from 'fs';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
+import { getBuildBlock } from '../../utils/buildInfo.js';
 
 export const schema = z.object({});
 
@@ -31,7 +32,8 @@ export async function handler(_args: z.infer<typeof schema>, _extra: RequestHand
       version: packageJson.version,
       description: packageJson.description,
       nodeVersion: process.version,
-      platform: process.platform
+      platform: process.platform,
+      build: getBuildBlock()
     };
 
     return {
