@@ -8,8 +8,8 @@
     "of-mcp": "./cli.cjs"
   },
   "scripts": {
-    "build": "tsc && npm run copy-files && chmod 755 dist/server.js",
-    "build:fast": "esbuild src/server.ts --bundle --platform=node --outfile=dist/server.js --format=esm --external:@modelcontextprotocol/sdk --external:zod && npm run copy-files && chmod 755 dist/server.js",
+    "build": "tsc && npm run copy-files && chmod 755 dist/server.js && node scripts/write-build-info.mjs",
+    "build:fast": "esbuild src/server.ts --bundle --platform=node --outfile=dist/server.js --format=esm --external:@modelcontextprotocol/sdk --external:zod && npm run copy-files && chmod 755 dist/server.js && node scripts/write-build-info.mjs",
     "copy-files": "mkdir -p dist/utils/omnifocusScripts/lib && cp src/utils/omnifocusScripts/*.js dist/utils/omnifocusScripts/ && cp src/utils/omnifocusScripts/lib/*.js dist/utils/omnifocusScripts/lib/",
     "start": "node dist/server.js",
     "dev": "tsc -w",
