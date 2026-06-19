@@ -23,7 +23,7 @@ function git(args) {
 const commit = git(['rev-parse', '--short', 'HEAD']) ?? 'unknown';
 
 // dist/ is gitignored, so a rebuild never shows in `git status --porcelain`;
-// a non-empty status therefore means uncommitted source changes.
+// a non-empty status therefore means uncommitted or untracked changes.
 const status = git(['status', '--porcelain']);
 const dirty = status === null ? null : status.length > 0;
 
