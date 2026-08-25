@@ -68,12 +68,16 @@ export async function handler(args: z.infer<typeof schema>, _extra: RequestHandl
         infoText += `• **Created**: ${createdDate}\n`;
       }
 
-      if (task.hasChildren && task.children && task.children.length > 0) {
-        infoText += `• **Subtasks** (${task.childrenCount}):\n`;
-        for (const child of task.children) {
-          const status = child.completed ? '✅' : child.dropped ? '🗑️' : '⚪';
-          const hasMore = child.hasChildren ? ` (+${child.childrenCount} more)` : '';
-          infoText += `  ${status} ${child.name}${hasMore} [ID: ${child.id}]\n`;
+      if (task.hasChildren) {
+        if (task.children && task.children.length > 0) {
+          infoText += `• **Subtasks** (${task.childrenCount}):\n`;
+          for (const child of task.children) {
+            const status = child.completed ? '✅' : child.dropped ? '🗑️' : '⚪';
+            const hasMore = child.hasChildren ? ` (+${child.childrenCount} more)` : '';
+            infoText += `  ${status} ${child.name}${hasMore} [ID: ${child.id}]\n`;
+          }
+        } else {
+          infoText += `• **Has Children**: Yes (${task.childrenCount} subtask(s), details unavailable)\n`;
         }
       } else {
         infoText += `• **Has Children**: No\n`;

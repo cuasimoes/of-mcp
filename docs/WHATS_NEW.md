@@ -1,8 +1,8 @@
-# OmniFocus MCP Server - What's New (v1.31.0)
+# OmniFocus MCP Server - What's New (v1.32.0)
 
 > Summary of changes from Sprints 1-10 for AI assistants using this MCP server.
 
-## v1.31.0 Folder path disambiguation and server version fix (Issues #1, #2, #3)
+## v1.32.0 Folder path disambiguation and server version fix
 
 **Folder path disambiguation:**
 - All tools accepting `folderName` now support `"Parent > Child"` path syntax to disambiguate folders with the same name at different hierarchy levels (e.g., `"Work > Areas"` vs `"Personal > Areas"`)
@@ -15,6 +15,36 @@
 
 **Server version fix:**
 - `get_server_version` no longer fails with ENOENT when the MCP server runs from a directory without a `package.json`
+
+---
+
+## v1.31.0 Expose subtasks in get_task_by_id response
+
+**`get_task_by_id` now returns a `children` array** containing one level of direct subtasks for any task that has them. Each child entry includes: `id`, `name`, `completed`, `dropped`, `flagged`, `dueDate`, `deferDate`, `hasChildren`, and `childrenCount`. The parent response also includes `hasChildren` and `childrenCount` fields so you can detect deep hierarchies without fetching children.
+
+**Display:** The tool output now shows subtasks with status icons (✅ completed, 🗑️ dropped, ⚪ active) and flags nesting depth with `(+N more)` when a child itself has children.
+
+**Depth cap:** Only direct children are returned. Grandchildren are not enumerated — use `get_task_by_id` on a child's ID to traverse further.
+
+**Robustness:** If children can't be loaded (e.g. during an OmniFocus sync), `children` defaults to `[]` and a `childrenError` field is set with the reason. `hasChildren` and `childrenCount` are always derived from the successfully-built children list, so they stay consistent.
+
+---
+
+## v1.30.9 Fix forecast date grouping and display for all timezones
+
+**`get_forecast_tasks` now groups tasks under the correct local date for UTC+ users.**
+`getDateKey` in `forecastTasks.js` previously called `toISOString()` after zeroing the time, which converts back to UTC — in a UTC+10 environment, local midnight April 28 became the key `"2026-04-27"`, placing tasks under the wrong day. The key is now built directly from local year/month/date components.
+
+**`formatDateSafe` now displays the correct date for bare `YYYY-MM-DD` strings in UTC- timezones.**
+`new Date("2026-04-28")` is parsed as UTC midnight, which `toLocaleDateString()` then renders as April 27 for UTC-X users. Bare date strings are now constructed with the local-time form `new Date(year, month, day)` to keep the displayed date accurate.
+
+---
+
+## v1.30.8 Fix add_project folderName case sensitivity (Issue #112)
+
+**`add_project` folder name lookup is now case-insensitive.** Previously `add_project` required an exact-case match on `folderName`, while `batch_add_items` and `edit_item` already matched case-insensitively. All three tools now behave consistently — e.g. `folderName: "work projects"` resolves to an existing `Work Projects` folder.
+
+**Note on issue #112 scope.** The issue also reported two other defects: (1) `batch_add_items` with `folderName` + `sequential: true` flipping projects to Dropped; (2) `edit_item` / `batch_edit_items` with `newProjectStatus: "active"` failing to recover Dropped projects. Neither could be reproduced in diagnostic testing against v1.30.7 across multiple variants (including a sequential project with child tasks, and drop-then-recover via both `edit_item` and `batch_edit_items`). The cited source code is unchanged; applying speculative fixes without a reproducer was deliberately avoided. Those reports remain open on #112 pending fresh steps-to-reproduce.
 
 ---
 
