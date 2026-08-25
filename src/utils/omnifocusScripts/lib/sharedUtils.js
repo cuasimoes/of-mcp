@@ -4,6 +4,13 @@
 /**
  * Parse date strings as local time.
  * Fixes issue where "2026-02-04" would be interpreted as midnight UTC.
+ *
+ * Twin of the hardened TypeScript `parseLocalDate()` in `src/utils/dateUtils.ts`.
+ * This OmniJS copy is intentionally separate (it is prepended into the OmniFocus
+ * runtime and is not importable from TS). Unlike the TS version it does NOT reject
+ * well-shaped-but-invalid dates (e.g. "2026-13-45" rolls forward) and would throw
+ * on null — #133 tracks hardening + testing this side. Keep the two in sync.
+ *
  * @param {string} dateStr - Date string in ISO format (YYYY-MM-DD or full ISO)
  * @returns {Date} - Date object in local timezone
  */
@@ -64,6 +71,22 @@ function buildRRule(rule) {
 function formatDate(date) {
   if (!date) return null;
   return date.toISOString();
+}
+
+/**
+ * Build a local YYYY-MM-DD date key from a Date.
+ * Uses local year/month/date components — toISOString() would convert to UTC,
+ * shifting the day for UTC+ users (see #114, #118).
+ * @param {Date|null|undefined} date - The date to format
+ * @returns {string|null} - Local date key (YYYY-MM-DD) or null if date is falsy
+ */
+function toLocalDateKey(date) {
+  if (!date) return null;
+  const d = new Date(date);
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
 }
 
 /**

@@ -1,6 +1,6 @@
 import { executeOmniFocusScript } from '../../utils/scriptExecution.js';
 import { logger } from '../../utils/logger.js';
-import { formatDateSafe } from '../../utils/dateUtils.js';
+import { formatDateSafe, parseLocalDate, classifyForecastDate } from '../../utils/dateUtils.js';
 
 const log = logger.child('getForecastTasks');
 
@@ -42,31 +42,29 @@ export async function getForecastTasks(options: GetForecastTasksOptions = {}): P
         if (dates.length === 0) {
           output += "🎉 No tasks due in the forecast period - enjoy the calm!\n";
         } else {
-          const today = new Date();
-          today.setHours(0, 0, 0, 0);
-          
+          const now = new Date();
+          let totalTasks = 0;
+
           dates.forEach(dateStr => {
             const tasks = data.tasksByDate[dateStr];
             if (!tasks || tasks.length === 0) return;
-            
-            const [year, month, day] = dateStr.split('-').map(Number);
-            const taskDate = new Date(year, month - 1, day);
-            const isToday = taskDate.getTime() === today.getTime();
-            const isTomorrow = taskDate.getTime() === today.getTime() + 24 * 60 * 60 * 1000;
-            const isOverdue = taskDate < today;
-            
+
+            const taskDate = parseLocalDate(dateStr);
+            if (!taskDate) return; // skip unparseable forecast keys
+            const category = classifyForecastDate(taskDate, now);
+
             let dateHeader = '';
-            if (isOverdue) {
+            if (category === 'OVERDUE') {
               dateHeader = `## ⚠️ OVERDUE - ${taskDate.toLocaleDateString()}`;
-            } else if (isToday) {
+            } else if (category === 'TODAY') {
               dateHeader = `## 🔥 TODAY - ${taskDate.toLocaleDateString()}`;
-            } else if (isTomorrow) {
+            } else if (category === 'TOMORROW') {
               dateHeader = `## ⏰ TOMORROW - ${taskDate.toLocaleDateString()}`;
             } else {
               const dayOfWeek = taskDate.toLocaleDateString('en-US', { weekday: 'long' });
               dateHeader = `## 📅 ${dayOfWeek} - ${taskDate.toLocaleDateString()}`;
             }
-            
+
             output += `${dateHeader}\n`;
             
             tasks.forEach((task: any) => {
@@ -83,12 +81,12 @@ export async function getForecastTasks(options: GetForecastTasksOptions = {}): P
                 output += `  📝 ${task.note.trim()}\n`;
               }
             });
-            
+
+            totalTasks += tasks.length; // count only dates we actually rendered
             output += '\n';
           });
-          
+
           // Summary
-          const totalTasks = dates.reduce((sum, date) => sum + data.tasksByDate[date].length, 0);
           output += `📊 **Summary**: ${totalTasks} task${totalTasks === 1 ? '' : 's'} in forecast\n`;
         }
       } else {
