@@ -18,24 +18,34 @@ function renderRule(rule: any, depth: number, disabled = false): string[] {
   const indent = RULE_INDENT + '  '.repeat(depth) + '- ';
   const prefix = disabled ? '[disabled] ' : '';
 
+  const formatFields = (entries: [string, any][]) => entries.map(([key, value]) =>
+    `${key}: ${typeof value === 'string' ? value : JSON.stringify(value)}`
+  ).join(', ');
+
   if (rule === null || typeof rule !== 'object') {
     return [`${indent}${prefix}${JSON.stringify(rule)}`];
+  }
+  if (Array.isArray(rule)) {
+    return rule.flatMap((item) => renderRule(item, depth, disabled));
   }
   if ('disabledRule' in rule) {
     return renderRule(rule.disabledRule, depth, true);
   }
   if (Array.isArray(rule.aggregateRules)) {
-    const lines = [`${indent}${prefix}${rule.aggregateType ?? 'all'} of:`];
+    const extras = Object.entries(rule).filter(([key]) => key !== 'aggregateType' && key !== 'aggregateRules');
+    const extraText = extras.length > 0 ? ` (${formatFields(extras)})` : '';
+    const lines = [`${indent}${prefix}${rule.aggregateType ?? 'all'} of${extraText}:`];
     for (const child of rule.aggregateRules) {
       lines.push(...renderRule(child, depth + 1));
     }
     return lines;
   }
+  const entries = Object.entries(rule);
+  if (entries.length === 0) {
+    return [`${indent}${prefix}(empty rule)`];
+  }
   // A leaf with several keys (e.g. actionDateField + actionDateIsInTheNext) is one rule
-  const fields = Object.entries(rule).map(([key, value]) =>
-    `${key}: ${typeof value === 'string' ? value : JSON.stringify(value)}`
-  );
-  return [`${indent}${prefix}${fields.join(', ')}`];
+  return [`${indent}${prefix}${formatFields(entries)}`];
 }
 
 function renderPerspectiveRules(p: any): string {
