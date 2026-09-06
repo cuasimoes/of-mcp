@@ -54,8 +54,10 @@ const SETUP = `(() => {
 const TEARDOWN = `(() => {
   try {
     const targets = flattenedTags.filter(t => t.name.startsWith('${PREFIX}'));
-    // Delete deepest first so no tag is deleted twice via cascade.
-    targets.sort((x, y) => y.name.localeCompare(x.name));
+    // Deleting a parent cascades to its children, and a cascaded-away Tag throws on
+    // any later access. Sort by real depth (deepest first) so each delete hits a leaf.
+    const depthOf = t => { let d = 0; for (let p = t.parent; p; p = p.parent) d++; return d; };
+    targets.sort((x, y) => depthOf(y) - depthOf(x));
     const deleted = [];
     for (const t of targets) {
       const name = t.name; // unreadable after deleteObject
@@ -89,16 +91,17 @@ async function main() {
   console.log('ISSUE #12: list_tags depth + count agreement');
   console.log('='.repeat(60));
 
-  console.log('\n1. Creating test tags (depth 3)...');
-  const setup = await runOmniJS('setup', SETUP);
-  if (!setup.success) {
-    console.error(`   Setup failed: ${setup.error}`);
-    process.exit(2);
-  }
-  console.log(`   ids: ${JSON.stringify(setup.ids)}  parents: ${JSON.stringify(setup.parents)}`);
-  check('depth-3 chain created', setup.parents.b === `${PREFIX}a` && setup.parents.c === `${PREFIX}b`);
-
+  // try starts before setup so a throw mid-setup still reaches the teardown,
+  // which deletes whatever `_oftest-12-*` tags exist regardless of how far setup got.
   try {
+    console.log('\n1. Creating test tags (depth 3)...');
+    const setup = await runOmniJS('setup', SETUP);
+    if (!setup.success) {
+      throw new Error(`Setup failed: ${setup.error}`);
+    }
+    console.log(`   ids: ${JSON.stringify(setup.ids)}  parents: ${JSON.stringify(setup.parents)}`);
+    check('depth-3 chain created', setup.parents.b === `${PREFIX}a` && setup.parents.c === `${PREFIX}b`);
+
     console.log('\n2. Running listTags primitive...');
     const output = await listTags({ includeDropped: false, showTaskCounts: false });
     const rendered = countRenderedEntries(output);

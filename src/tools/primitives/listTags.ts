@@ -82,13 +82,19 @@ export async function listTags(options: ListTagsOptions = {}): Promise<string> {
       }
     };
 
+    let rendered = 0;
     const renderTag = (tag: TagInfo, depth: number) => {
+      rendered++;
       const status = getStatusDisplay(tag.status);
       const tasks = (showTaskCounts && tag.availableTaskCount && tag.availableTaskCount > 0)
         ? ` [${tag.availableTaskCount} available]`
         : '';
       if (depth === 0) {
-        output += `• **${tag.name}**${status}${tasks} [ID: ${tag.id}]\n`;
+        // A top-level entry that still has a parentId was promoted because its parent is not in the result.
+        const orphan = tag.parentId
+          ? (tag.parent ? ` (parent "${tag.parent}" not shown)` : ' (parent not shown)')
+          : '';
+        output += `• **${tag.name}**${orphan}${status}${tasks} [ID: ${tag.id}]\n`;
       } else {
         output += `${'  '.repeat(depth)}└─ ${tag.name}${status}${tasks} [ID: ${tag.id}]\n`;
       }
@@ -102,6 +108,9 @@ export async function listTags(options: ListTagsOptions = {}): Promise<string> {
     }
 
     output += `\n📊 **Summary**: ${parsed.count} tags\n`;
+    if (rendered < parsed.count) {
+      output += `⚠️ ${parsed.count - rendered} tags not rendered (unreachable parent chain)\n`;
+    }
 
     return output;
 
