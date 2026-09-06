@@ -65,13 +65,22 @@ const SETUP_SCRIPT = `(() => {
   const aDup = new Tag(P + 'Dup', a.ending);
   const b = new Tag(P + 'B');
   const bDup = new Tag(P + 'Dup', b.ending);
+  // Dropped PARENT with an active child: child.active stays true, only
+  // effectiveActive reflects the parent's status (issue #5 canonical repro)
+  const parent = new Tag(P + 'P');
+  const kid = new Tag(P + 'Kid', parent.ending);
+  parent.status = Tag.Status.Dropped;
   return JSON.stringify({
     droppedId: dropped.id.primaryKey,
     soloId: solo.id.primaryKey,
     aId: a.id.primaryKey,
     aDupId: aDup.id.primaryKey,
     bId: b.id.primaryKey,
-    bDupId: bDup.id.primaryKey
+    bDupId: bDup.id.primaryKey,
+    parentId: parent.id.primaryKey,
+    kidId: kid.id.primaryKey,
+    kidActive: kid.active,
+    kidEffectiveActive: kid.effectiveActive
   });
 })()`;
 
@@ -137,12 +146,16 @@ async function main() {
     const aPath = `${PREFIX}A > ${PREFIX}Dup`;
     const bPath = `${PREFIX}B > ${PREFIX}Dup`;
     const bogusPath = `${PREFIX}A > ${PREFIX}Nope`;
-    garbageNames.push(fixture.aDupId, fixture.bDupId, aPath, bPath, bogusPath);
+    // 11 chars, no digit/_/-/inner uppercase: must be treated as a NAME, not an ID
+    const ELEVEN_CHAR_NAME = 'Oftestphoto';
+    garbageNames.push(fixture.aDupId, fixture.bDupId, aPath, bPath, bogusPath, ELEVEN_CHAR_NAME);
     let snap = await inspect({});
-    const FIXTURE_TAGS = 6;
+    const FIXTURE_TAGS = 8;
     console.log(`   dropped Dup=${fixture.droppedId}  A>Dup=${fixture.aDupId}  B>Dup=${fixture.bDupId}`);
+    console.log(`   dropped parent P=${fixture.parentId}  P>Kid=${fixture.kidId} (active=${fixture.kidActive}, effectiveActive=${fixture.kidEffectiveActive})`);
     console.log(`   our tags: ${snap.ourTags.join(', ')}`);
-    check('fixture created 6 tags', snap.ourTags.length === FIXTURE_TAGS, `${snap.ourTags.length}`);
+    check('fixture created 8 tags', snap.ourTags.length === FIXTURE_TAGS, `${snap.ourTags.length}`);
+    check('fixture: child of dropped parent has active=true but effectiveActive=false', fixture.kidActive === true && fixture.kidEffectiveActive === false);
 
     // ---- add_project with a tag ID (#7 on add paths) ----
     console.log(`\n1. add_project "${PROJECT_NAME}" with tags: ["${fixture.aDupId}"] (ID of A>Dup)`);
@@ -176,7 +189,27 @@ async function main() {
     const t3Tags = snap.items[t3.taskId] || [];
     check('(#5) task3 did NOT get the dropped Solo tag', !t3Tags.some(t => t.id === fixture.soloId), tagsOf(snap, t3.taskId));
     check('(#5) task3 got a NEW active Solo tag', t3Tags.some(t => t.active && t.name === `${PREFIX}Solo`) && snap.ourTags.length === FIXTURE_TAGS + 1, snap.ourTags.join(', '));
-    const EXPECTED_TAGS = FIXTURE_TAGS + 1;
+    check('(#5) creation warning returned for Solo', Array.isArray(t3.warnings) && t3.warnings.some(w => /created/i.test(w)), JSON.stringify(t3.warnings));
+
+    // ---- (a3) dropped PARENT, active child: child.active is true but it must not be used (#5) ----
+    console.log(`\n3b. add_omnifocus_task with tags: ["${PREFIX}Kid"] (only match is under a DROPPED parent)`);
+    const t4 = await addOmniFocusTask({ name: `${PREFIX}task4`, projectId: proj.projectId, tags: [`${PREFIX}Kid`] });
+    if (!t4.success) throw new Error(`addOmniFocusTask failed: ${t4.error}`);
+    created.taskIds.push(t4.taskId);
+    if (t4.warnings) console.log(`   warnings: ${t4.warnings.join(' | ')}`);
+    snap = await inspect({ taskIds: [t4.taskId] });
+    const t4Tags = snap.items[t4.taskId] || [];
+    check('(#5) task4 did NOT get the child of the dropped parent', !t4Tags.some(t => t.id === fixture.kidId), tagsOf(snap, t4.taskId));
+    check('(#5) task4 got a NEW Kid tag (count +1) with a creation warning', t4Tags.some(t => t.name === `${PREFIX}Kid` && t.id !== fixture.kidId) && snap.ourTags.length === FIXTURE_TAGS + 2 && Array.isArray(t4.warnings) && t4.warnings.some(w => /created/i.test(w)), `${snap.ourTags.join(', ')} warnings=${JSON.stringify(t4.warnings)}`);
+
+    // ---- 11-char plain name must be created, not rejected as an ID (#7 heuristic) ----
+    console.log(`\n3c. add_omnifocus_task with tags: ["${ELEVEN_CHAR_NAME}"] (11 chars, looks like a word not an ID)`);
+    const t5 = await addOmniFocusTask({ name: `${PREFIX}task5`, projectId: proj.projectId, tags: [ELEVEN_CHAR_NAME] });
+    check('(#7) 11-char plain name is accepted', t5.success === true, t5.error);
+    if (t5.success) created.taskIds.push(t5.taskId);
+    snap = await inspect({ taskIds: t5.success ? [t5.taskId] : [] });
+    check('(#7) 11-char plain name was created and attached', t5.success && (snap.items[t5.taskId] || []).some(t => t.name === ELEVEN_CHAR_NAME) && snap.ourTags.length === FIXTURE_TAGS + 3, snap.ourTags.join(', '));
+    const EXPECTED_TAGS = FIXTURE_TAGS + 3;
 
     // ---- (b) edit_item replaceTags by ID (#7) ----
     console.log(`\n4. edit_item replaceTags: ["${fixture.aDupId}"] (tag ID of A>Dup)`);
@@ -208,6 +241,35 @@ async function main() {
     check('(#7) unresolvable path returns an error', e.success === false, e.error || 'reported success');
     check('(#7) unresolvable path created no tag', snap.ourTags.length === EXPECTED_TAGS, snap.ourTags.join(', '));
 
+    // ---- replaceTags + addTags together: addTags is ignored by the apply step, so it must not create a stray tag ----
+    console.log(`\n6b. edit_item replaceTags: ["${fixture.aDupId}"] + addTags: ["${PREFIX}Stray"] together`);
+    e = await editItem({ id: t1.taskId, itemType: 'task', replaceTags: [fixture.aDupId], addTags: [`${PREFIX}Stray`] });
+    snap = await inspect({ taskIds: [t1.taskId] });
+    t1Tags = snap.items[t1.taskId] || [];
+    check('replaceTags+addTags succeeded and left only A>Dup', e.success === true && t1Tags.length === 1 && t1Tags[0].id === fixture.aDupId, `${e.error || ''} ${tagsOf(snap, t1.taskId)}`);
+    check('replaceTags+addTags created no stray tag', !snap.ourTags.includes(`${PREFIX}Stray`) && snap.ourTags.length === EXPECTED_TAGS, snap.ourTags.join(', '));
+
+    // ---- empty reference must be an error, not "replace everything with nothing" ----
+    console.log(`\n6c. edit_item replaceTags: [""]`);
+    e = await editItem({ id: t1.taskId, itemType: 'task', replaceTags: [''] });
+    snap = await inspect({ taskIds: [t1.taskId] });
+    t1Tags = snap.items[t1.taskId] || [];
+    check('empty tag reference returns an error and leaves tags untouched', e.success === false && t1Tags.some(t => t.id === fixture.aDupId), `${e.error || 'reported success'} ${tagsOf(snap, t1.taskId)}`);
+
+    // ---- removeTags by name must reach a DROPPED tag that is on the item (#5 cleanup path) ----
+    console.log(`\n6d. pin dropped Dup on task1, then edit_item removeTags: ["${dupName}"]`);
+    await runOmniJS(SET_TAGS_SCRIPT, { assignments: { [t1.taskId]: [fixture.aDupId, fixture.droppedId] } });
+    e = await editItem({ id: t1.taskId, itemType: 'task', removeTags: [dupName] });
+    snap = await inspect({ taskIds: [t1.taskId] });
+    t1Tags = snap.items[t1.taskId] || [];
+    check('removeTags by name removed the dropped tag from the item', e.success === true && !t1Tags.some(t => t.id === fixture.droppedId), `${e.error || ''} ${tagsOf(snap, t1.taskId)}`);
+    check('removeTags reports tags (removed)', e.success === true && /tags \(removed\)/.test(e.changedProperties || ''), e.changedProperties);
+
+    // ---- removeTags of something not on the item: warning, no "tags (removed)" ----
+    console.log(`\n6e. edit_item removeTags: ["${PREFIX}Solo"] (not on task1)`);
+    e = await editItem({ id: t1.taskId, itemType: 'task', removeTags: [`${PREFIX}Solo`] });
+    check('removeTags miss: success with warning, no tags (removed)', e.success === true && !/tags \(removed\)/.test(e.changedProperties || '') && Array.isArray(e.warnings) && e.warnings.length > 0, `changed=${e.changedProperties} warnings=${JSON.stringify(e.warnings)}`);
+
     // ---- batch_add_items with tags by path (#7 on add paths) ----
     console.log(`\n7. batch_add_items task with tags: ["${bPath}"]`);
     const ba = await batchAddItems([{ type: 'task', name: `${PREFIX}task2`, projectId: proj.projectId, tags: [bPath] }]);
@@ -217,6 +279,16 @@ async function main() {
     snap = await inspect({ taskIds: [t2.id] });
     check('(#7) task2 got B>Dup via path in batch_add_items', (snap.items[t2.id] || []).some(t => t.id === fixture.bDupId), tagsOf(snap, t2.id));
     check('(#7) batch_add_items created no garbage tag', snap.ourTags.length === EXPECTED_TAGS, snap.ourTags.join(', '));
+
+    console.log(`\n7b. batch_add_items project with tags: ["zzzzzzzzz_9"] (ID-shaped, does not exist)`);
+    const baBad = await batchAddItems([{ type: 'project', name: `${PREFIX}badproj`, tags: ['zzzzzzzzz_9'] }]);
+    const badRes = baBad.results[0] || {};
+    check('(#7) ID-shaped miss fails the item and the failure carries type', badRes.success === false && badRes.type === 'project', JSON.stringify(badRes));
+
+    console.log(`\n7c. get_tasks_by_tag tagId of the DROPPED Dup (pinned on task3), includeDropped not set`);
+    await runOmniJS(SET_TAGS_SCRIPT, { assignments: { [t3.taskId]: [fixture.droppedId] } });
+    const outDropped = await getTasksByTag({ tagId: fixture.droppedId, hideCompleted: true });
+    check('tagId resolves a dropped tag without includeDropped and reports its path', outDropped.includes(t3.taskId) && outDropped.includes(`**Matched tags**: ${dupName}`), outDropped.split('\n').slice(0, 4).join(' / '));
 
     // ---- (c) get_tasks_by_tag by ambiguous name returns tasks from BOTH tags (#11) ----
     // Pin the tags by ID first so this check does not depend on #5/#7 having passed.

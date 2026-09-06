@@ -196,11 +196,9 @@
       name: newTask.name,
       isRepeating: newTask.repetitionRule !== null
     };
-    if (repetitionWarning) {
-      result.warning = repetitionWarning;
-    }
-    if (tagWarnings.length > 0) {
-      result.warnings = tagWarnings;
+    const warnings = tagWarnings.concat(repetitionWarning ? [repetitionWarning] : []);
+    if (warnings.length > 0) {
+      result.warnings = warnings;
     }
     return JSON.stringify(result);
 

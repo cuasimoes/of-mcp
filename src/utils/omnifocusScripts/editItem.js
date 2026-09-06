@@ -34,9 +34,6 @@
       tasksById.set(t.id.primaryKey, t);
     });
 
-    const tagsByName = new Map();
-    flattenedTags.forEach(t => tagsByName.set(t.name.toLowerCase(), t));
-
     const allFolders = flattenedFolders;
 
     // Find the item using Maps
@@ -72,21 +69,34 @@
     const originalId = foundItem.id.primaryKey;
 
     // Resolve tag references (ID / "Parent > Child" path / active name) up front so
-    // an unresolvable reference fails the edit before any property is changed
+    // an unresolvable reference fails the edit before any property is changed.
+    // Only the fields the apply step will use are resolved: replaceTags wins over
+    // addTags/removeTags, so nothing gets created for a field that is then ignored.
     const resolvedTagOps = {};
     let tagWarnings = [];
-    for (const [field, createIfMissing] of [['replaceTags', true], ['addTags', true], ['removeTags', false]]) {
-      if (args[field] && args[field].length > 0) {
-        const tagResolution = resolveTagRefs(args[field], { createIfMissing });
-        if (tagResolution.errors.length > 0) {
-          return JSON.stringify({
-            success: false,
-            error: tagResolution.errors.join('; ')
-          });
-        }
-        resolvedTagOps[field] = tagResolution.tags;
-        tagWarnings = tagWarnings.concat(tagResolution.warnings);
+    const createField = (args.replaceTags && args.replaceTags.length > 0) ? 'replaceTags'
+      : (args.addTags && args.addTags.length > 0) ? 'addTags' : null;
+    if (createField) {
+      const tagResolution = resolveTagRefs(args[createField], { createIfMissing: true });
+      if (tagResolution.errors.length > 0) {
+        return JSON.stringify({
+          success: false,
+          error: tagResolution.errors.join('; ')
+        });
       }
+      resolvedTagOps[createField] = tagResolution.tags;
+      tagWarnings = tagWarnings.concat(tagResolution.warnings);
+    }
+    if (createField !== 'replaceTags' && args.removeTags && args.removeTags.length > 0) {
+      const removal = resolveTagRefsOnItem(args.removeTags, foundItem);
+      if (removal.errors.length > 0) {
+        return JSON.stringify({
+          success: false,
+          error: removal.errors.join('; ')
+        });
+      }
+      resolvedTagOps.removeTags = removal.tags;
+      tagWarnings = tagWarnings.concat(removal.warnings);
     }
 
     // Apply changes
@@ -239,8 +249,8 @@
         changedProperties.push("tags (added)");
       }
 
-      // Remove tags (tasks and projects both support tags)
-      if (resolvedTagOps.removeTags) {
+      // Remove tags (tasks and projects both support tags); a miss is a warning, not a change
+      if (resolvedTagOps.removeTags && resolvedTagOps.removeTags.length > 0) {
         for (const tag of resolvedTagOps.removeTags) {
           foundItem.removeTag(tag);
         }

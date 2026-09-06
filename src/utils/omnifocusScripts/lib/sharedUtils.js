@@ -170,38 +170,48 @@ function getTagPath(tag) {
   }
 }
 
-// OmniFocus object identifiers are 11 URL-safe base64 characters
-const TAG_ID_PATTERN = /^[A-Za-z0-9_-]{11}$/;
+/**
+ * OmniFocus identifiers are 11 URL-safe base64 characters, but so is an ordinary
+ * word like "Photography". A miss is only treated as a failed ID lookup when the
+ * string also carries a digit, "_", "-", or an uppercase letter past the first
+ * character; an all-letters, capitalised-only string is a name to create.
+ * (A real ID made of lowercase letters only would be mistaken for a name — rare.)
+ */
+function looksLikeTagId(ref) {
+  return /^[A-Za-z0-9_-]{11}$/.test(ref) && /[0-9_-]|^.+[A-Z]/.test(ref);
+}
 
 /**
- * Resolve tag references for write paths (`tags` on add, addTags/removeTags/replaceTags).
+ * Plan step of tag resolution: pure, creates nothing.
  *
  * Each entry is tried, in order, as an exact tag ID, a "Parent > Child" path walked
- * from the top level, then a plain name. Names and paths only match ACTIVE tags
- * (case-insensitive) so a dropped tag is never re-attached by name (#5); IDs match
- * any tag. An ID-shaped string or a path that fails to resolve is an error rather
- * than a new literal tag (#7). Plain names that match nothing are created when
- * `createIfMissing` is set — but only after every entry has resolved, so a bad
- * entry never leaves half the tags created.
+ * from the top level, then a plain name. Names and paths only match tags that are
+ * effectively active (case-insensitive) — `effectiveActive`, not `active`, because a
+ * child of a dropped parent still reports `active` (#5). IDs match any tag. An
+ * ID-shaped string or a path that fails to resolve is an error rather than a new
+ * literal tag (#7); so is an empty entry. Plain names that match nothing become
+ * `{createName}` entries when `createIfMissing` is set.
  *
- * @param {string[]} refs - Tag IDs, paths, or names
- * @param {{createIfMissing?: boolean}} [options]
- * @returns {{tags: Tag[], errors: string[], warnings: string[]}} - `tags` is empty when `errors` is non-empty
+ * @param {string[]} refs
+ * @param {boolean} createIfMissing
+ * @returns {{entries: Array<{tag?: Tag, createName?: string, droppedCollision?: boolean}>, errors: string[], warnings: string[]}}
  */
-function resolveTagRefs(refs, options) {
-  const createIfMissing = !!(options && options.createIfMissing);
-  const resolved = [];
+function planTagRefs(refs, createIfMissing) {
+  const entries = [];
   const errors = [];
   const warnings = [];
 
   for (const rawRef of refs) {
-    const ref = String(rawRef).trim();
-    if (!ref) continue;
+    const ref = String(rawRef == null ? '' : rawRef).trim();
+    if (!ref) {
+      errors.push('Empty tag reference');
+      continue;
+    }
 
     let tag = null;
     try { tag = Tag.byIdentifier(ref); } catch (e) { tag = null; }
     if (tag) {
-      resolved.push({ tag: tag });
+      entries.push({ tag: tag });
       continue;
     }
 
@@ -209,13 +219,16 @@ function resolveTagRefs(refs, options) {
       const segments = ref.split(' > ').map(function(s) { return s.trim().toLowerCase(); });
       let level = flattenedTags.filter(function(t) { return !t.parent; });
       for (const segment of segments) {
-        const matches = level.filter(function(t) { return t.active && t.name.toLowerCase() === segment; });
+        const matches = level.filter(function(t) { return t.effectiveActive && t.name.toLowerCase() === segment; });
         tag = matches.length > 0 ? matches[0] : null;
         if (!tag) break;
+        if (matches.length > 1) {
+          warnings.push(`Tag path "${ref}" is ambiguous at "${segment}" (${matches.map(getTagPath).join('; ')}); used "${getTagPath(tag)}". Pass a tag ID to disambiguate.`);
+        }
         level = tag.children;
       }
       if (tag) {
-        resolved.push({ tag: tag });
+        entries.push({ tag: tag });
       } else {
         errors.push(`Tag path not found: "${ref}"`);
       }
@@ -227,34 +240,99 @@ function resolveTagRefs(refs, options) {
     let droppedMatch = false;
     for (const t of flattenedTags) {
       if (t.name.toLowerCase() !== nameLower) continue;
-      if (t.active) activeMatches.push(t); else droppedMatch = true;
+      if (t.effectiveActive) activeMatches.push(t); else droppedMatch = true;
     }
     if (activeMatches.length > 0) {
       if (activeMatches.length > 1) {
         warnings.push(`Tag name "${ref}" is ambiguous (${activeMatches.map(getTagPath).join('; ')}); used "${getTagPath(activeMatches[0])}". Pass a tag ID or "Parent > Child" path to disambiguate.`);
       }
-      resolved.push({ tag: activeMatches[0] });
-    } else if (TAG_ID_PATTERN.test(ref)) {
+      entries.push({ tag: activeMatches[0] });
+    } else if (looksLikeTagId(ref)) {
       errors.push(`Tag not found with ID or name "${ref}"`);
     } else if (createIfMissing) {
-      resolved.push({ createName: ref });
-      if (droppedMatch) {
-        warnings.push(`Tag "${ref}" only matched a dropped tag; created a new active tag instead of reusing it.`);
-      }
+      entries.push({ createName: ref, droppedCollision: droppedMatch });
     }
   }
 
-  if (errors.length > 0) {
-    return { tags: [], errors: errors, warnings: warnings };
-  }
+  return { entries: entries, errors: errors, warnings: warnings };
+}
 
-  const createdByName = new Map();
-  const tags = resolved.map(function(entry) {
+/**
+ * Materialize step: turn plan entries into Tag objects, creating the missing ones.
+ * `createdByName` is shared across calls so the same name is never created twice.
+ * Every creation is reported in `warnings` so auto-creation is visible to the caller.
+ * @returns {Tag[]}
+ */
+function materializeTagPlan(entries, createdByName, warnings) {
+  return entries.map(function(entry) {
     if (entry.tag) return entry.tag;
     const key = entry.createName.toLowerCase();
-    if (!createdByName.has(key)) createdByName.set(key, new Tag(entry.createName));
+    if (!createdByName.has(key)) {
+      createdByName.set(key, new Tag(entry.createName));
+      warnings.push(entry.droppedCollision
+        ? `Created new tag "${entry.createName}" (an existing tag with that name is dropped and was not reused).`
+        : `Created new tag "${entry.createName}".`);
+    }
     return createdByName.get(key);
   });
+}
+
+/**
+ * Resolve tag references for write paths (`tags` on add, addTags/replaceTags).
+ * Plan first, then create — nothing is created when any entry fails to resolve,
+ * so a bad entry never leaves half the tags behind.
+ *
+ * @param {string[]} refs - Tag IDs, paths, or names
+ * @param {{createIfMissing?: boolean}} [options]
+ * @returns {{tags: Tag[], errors: string[], warnings: string[]}} - `tags` is empty when `errors` is non-empty
+ */
+function resolveTagRefs(refs, options) {
+  const plan = planTagRefs(refs, !!(options && options.createIfMissing));
+  if (plan.errors.length > 0) {
+    return { tags: [], errors: plan.errors, warnings: plan.warnings };
+  }
+  const tags = materializeTagPlan(plan.entries, new Map(), plan.warnings);
+  return { tags: tags, errors: plan.errors, warnings: plan.warnings };
+}
+
+/**
+ * Resolve references for removal against the item's OWN tags: ID, then path, then
+ * name, any status — so a dropped tag that #5 already attached can be removed by
+ * name. Every own tag matching the reference is returned (two same-named tags on
+ * one item both go). A reference matching nothing on the item is a warning, never
+ * an error, and contributes no tag.
+ *
+ * @param {string[]} refs
+ * @param {Task|Project} item
+ * @returns {{tags: Tag[], errors: string[], warnings: string[]}}
+ */
+function resolveTagRefsOnItem(refs, item) {
+  const tags = [];
+  const errors = [];
+  const warnings = [];
+  const own = item.tags;
+
+  for (const rawRef of refs) {
+    const ref = String(rawRef == null ? '' : rawRef).trim();
+    if (!ref) {
+      errors.push('Empty tag reference');
+      continue;
+    }
+    const refLower = ref.toLowerCase();
+    let matches = own.filter(function(t) { return t.id.primaryKey === ref; });
+    if (matches.length === 0 && ref.indexOf(' > ') !== -1) {
+      matches = own.filter(function(t) { return getTagPath(t).toLowerCase() === refLower; });
+    }
+    if (matches.length === 0) {
+      matches = own.filter(function(t) { return t.name.toLowerCase() === refLower; });
+    }
+    if (matches.length === 0) {
+      warnings.push(`Tag "${ref}" is not on this item; nothing removed.`);
+      continue;
+    }
+    matches.forEach(function(t) { tags.push(t); });
+  }
+
   return { tags: tags, errors: errors, warnings: warnings };
 }
 

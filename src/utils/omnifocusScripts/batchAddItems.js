@@ -59,12 +59,13 @@
 
     // Resolve tag references (ID / "Parent > Child" path / active name) for one
     // item. Returns null after pushing a failure result if any reference is bad.
-    function resolveItemTags(tagNames, itemName) {
+    function resolveItemTags(tagNames, itemName, itemType) {
       if (!tagNames || tagNames.length === 0) return { tags: [], warnings: [] };
       const tagResolution = resolveTagRefs(tagNames, { createIfMissing: true });
       if (tagResolution.errors.length > 0) {
         results.push({
           success: false,
+          type: itemType,
           name: itemName,
           error: tagResolution.errors.join('; ')
         });
@@ -199,7 +200,7 @@
           }
 
           // Resolve tags before creating the task so a bad reference leaves nothing behind
-          const taskTags = resolveItemTags(tagNames, itemName);
+          const taskTags = resolveItemTags(tagNames, itemName, itemType);
           if (!taskTags) continue;
 
           // Create the task
@@ -257,11 +258,9 @@
           if (item.tempId) {
             taskResult.tempId = item.tempId;
           }
-          if (repetitionWarning) {
-            taskResult.warning = repetitionWarning;
-          }
-          if (taskTags.warnings.length > 0) {
-            taskResult.warnings = taskTags.warnings;
+          const taskWarnings = taskTags.warnings.concat(repetitionWarning ? [repetitionWarning] : []);
+          if (taskWarnings.length > 0) {
+            taskResult.warnings = taskWarnings;
           }
           results.push(taskResult);
 
@@ -298,7 +297,7 @@
           }
 
           // Resolve tags before creating the project so a bad reference leaves nothing behind
-          const projectTags = resolveItemTags(tagNames, itemName);
+          const projectTags = resolveItemTags(tagNames, itemName, itemType);
           if (!projectTags) continue;
 
           // Create the project

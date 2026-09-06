@@ -18,7 +18,6 @@
     let projectsById = null;
     let tasksByName = null;
     let tasksById = null;
-    let tagsByName = null;
     let cachedFolders = null;
     let foldersById = null;
 
@@ -56,14 +55,6 @@
         flattenedTasks.forEach(t => tasksById.set(t.id.primaryKey, t));
       }
       return tasksById;
-    }
-
-    function getTagsByName() {
-      if (!tagsByName) {
-        tagsByName = new Map();
-        flattenedTags.forEach(t => tagsByName.set(t.name.toLowerCase(), t));
-      }
-      return tagsByName;
     }
 
     function getAllFolders() {
@@ -124,19 +115,30 @@
         const originalId = foundItem.id.primaryKey;
 
         // Resolve tag references (ID / "Parent > Child" path / active name) up front so
-        // an unresolvable reference fails this edit before any property is changed
+        // an unresolvable reference fails this edit before any property is changed.
+        // Only the fields the apply step will use are resolved: replaceTags wins over
+        // addTags/removeTags, so nothing gets created for a field that is then ignored.
         const resolvedTagOps = {};
         let tagWarnings = [];
         let tagError = null;
-        for (const [field, createIfMissing] of [['replaceTags', true], ['addTags', true], ['removeTags', false]]) {
-          if (edit[field] && edit[field].length > 0) {
-            const tagResolution = resolveTagRefs(edit[field], { createIfMissing });
-            if (tagResolution.errors.length > 0) {
-              tagError = tagResolution.errors.join('; ');
-              break;
-            }
-            resolvedTagOps[field] = tagResolution.tags;
+        const createField = (edit.replaceTags && edit.replaceTags.length > 0) ? 'replaceTags'
+          : (edit.addTags && edit.addTags.length > 0) ? 'addTags' : null;
+        if (createField) {
+          const tagResolution = resolveTagRefs(edit[createField], { createIfMissing: true });
+          if (tagResolution.errors.length > 0) {
+            tagError = tagResolution.errors.join('; ');
+          } else {
+            resolvedTagOps[createField] = tagResolution.tags;
             tagWarnings = tagWarnings.concat(tagResolution.warnings);
+          }
+        }
+        if (!tagError && createField !== 'replaceTags' && edit.removeTags && edit.removeTags.length > 0) {
+          const removal = resolveTagRefsOnItem(edit.removeTags, foundItem);
+          if (removal.errors.length > 0) {
+            tagError = removal.errors.join('; ');
+          } else {
+            resolvedTagOps.removeTags = removal.tags;
+            tagWarnings = tagWarnings.concat(removal.warnings);
           }
         }
         if (tagError) {
@@ -289,8 +291,8 @@
             }
             changedProperties.push("tags (added)");
           }
-          // Remove tags (tasks and projects both support tags)
-          if (resolvedTagOps.removeTags) {
+          // Remove tags (tasks and projects both support tags); a miss is a warning, not a change
+          if (resolvedTagOps.removeTags && resolvedTagOps.removeTags.length > 0) {
             for (const tag of resolvedTagOps.removeTags) {
               foundItem.removeTag(tag);
             }

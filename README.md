@@ -818,7 +818,9 @@ Tag names are not unique in OmniFocus — `Action > Training` and a dropped `Aka
 2. **Path** (`"Action > Training"`) — walked from the top level, active tags only
 3. **Plain name** (`"Training"`) — active tags only; never matches a dropped tag. Created if missing.
 
-An ID-shaped string or a path that does not resolve is an error — it never becomes a literal tag name. When a plain name matches more than one active tag, the first is used and the response carries a warning listing every candidate path.
+An ID-shaped string or a path that does not resolve is an error — it never becomes a literal tag name. "ID-shaped" is a heuristic: 11 URL-safe base64 characters that also contain a digit, `_`, `-`, or an uppercase letter after the first character. An 11-letter word such as `Photography` is therefore still a name and gets created; a real ID made only of lowercase letters would be mistaken for a name (rare). When a plain name matches more than one active tag, the first is used and the response carries a warning listing every candidate path. Every tag that gets auto-created is reported in a warning.
+
+`removeTags` resolves against the item's **own** tags (ID, path, then name — any status, so a dropped tag can be removed by name); a reference that matches nothing on the item is a warning and `tags (removed)` is not reported.
 
 `get_tasks_by_tag` with `tagName` returns tasks from **all** same-named tags and flags the name as ambiguous; pass a `Parent > Child` path (or `tagId`) to target one.
 

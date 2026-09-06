@@ -46,23 +46,21 @@
       : flattenedTags.filter(tag => tag.active);
     exportData.availableTags = allTags.map(tag => tag.name).sort();
 
-    // Build tag ID map for ID lookups
-    const tagsById = new Map();
-    allTags.forEach(tag => tagsById.set(tag.id.primaryKey, tag));
-
     console.log(`Searching for tags (${tagNames.length > 0 ? 'by name' : 'by ID'}): [${(tagNames.length > 0 ? tagNames : tagIds).join(', ')}] (exact: ${exactMatch}, mode: ${matchMode})`);
 
     // Find matching OmniFocus tags for each search term
     const matchingTagsBySearchTerm = new Map();
 
     if (tagIds.length > 0) {
-      // Search by ID - exact match only
+      // Search by ID - exact match, any status (an ID is explicit; includeDropped
+      // only governs name search)
       tagIds.forEach(searchId => {
-        const tag = tagsById.get(searchId);
+        let tag = null;
+        try { tag = Tag.byIdentifier(searchId); } catch (e) { tag = null; }
         const matches = tag ? [tag] : [];
         matchingTagsBySearchTerm.set(searchId, matches);
-        exportData.matchedTagsBySearchTerm[searchId] = matches.map(t => t.name);
-        console.log(`Search ID "${searchId}" matched ${matches.length} tags: ${matches.map(t => t.name).join(', ')}`);
+        exportData.matchedTagsBySearchTerm[searchId] = matches.map(getTagPath);
+        console.log(`Search ID "${searchId}" matched ${matches.length} tags: ${matches.map(getTagPath).join(', ')}`);
       });
     } else {
       // Search by name; a "Parent > Child" term matches the full path exactly (#11)
