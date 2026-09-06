@@ -67,7 +67,9 @@ export async function handler(args: z.infer<typeof schema>, _extra: RequestHandl
           if (item.container?.type === 'project' && item.container.name) {
             locationText = ` in project "${item.container.name}"`;
           } else if (item.container?.type === 'parentTask' && item.container.name) {
-            locationText = ` as a subtask of "${item.container.name}"`;
+            locationText = ` as a subtask of "${item.container.name}" (id ${item.container.id})`;
+          } else if (item.container?.type === 'inbox') {
+            locationText = ' in your inbox';
           }
           return `- ✅ ${item.type}: "${item.name}"${idText}${locationText}`;
         } else {

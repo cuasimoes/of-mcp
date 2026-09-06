@@ -58,10 +58,6 @@ function validateParentTaskParams(params: AddOmniFocusTaskParams): {valid: boole
   return { valid: true };
 }
 
-/**
- * Add a task to OmniFocus
- * Uses OmniJS to correctly parse ISO date formats and handle special characters
- */
 // Container the script actually placed the task in (resolved from projectId/projectName/parent*)
 export interface TaskContainer {
   type: 'inbox' | 'project' | 'parentTask';
@@ -69,6 +65,10 @@ export interface TaskContainer {
   name?: string;
 }
 
+/**
+ * Add a task to OmniFocus
+ * Uses OmniJS to correctly parse ISO date formats and handle special characters
+ */
 export async function addOmniFocusTask(params: AddOmniFocusTaskParams): Promise<{success: boolean, taskId?: string, container?: TaskContainer, error?: string}> {
   try {
     // Validate parameters
