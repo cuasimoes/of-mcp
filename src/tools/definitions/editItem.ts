@@ -57,8 +57,9 @@ export const schema = z.object({
 
 // Fields that select the item or qualify another mutation rather than change anything
 // themselves. Every other schema key is a mutation, so new fields are picked up automatically.
-const NON_MUTATION_FIELDS = new Set(['id', 'name', 'itemType', 'dropCompletely']);
-const MUTATION_FIELDS = Object.keys(schema.shape).filter(key => !NON_MUTATION_FIELDS.has(key));
+type SchemaKey = keyof typeof schema.shape;
+const NON_MUTATION_FIELDS: ReadonlySet<SchemaKey> = new Set<SchemaKey>(['id', 'name', 'itemType', 'dropCompletely']);
+const MUTATION_FIELDS = (Object.keys(schema.shape) as SchemaKey[]).filter(key => !NON_MUTATION_FIELDS.has(key));
 
 export async function handler(args: z.infer<typeof schema>, _extra: RequestHandlerExtra<ServerRequest, ServerNotification>) {
   try {
@@ -75,7 +76,7 @@ export async function handler(args: z.infer<typeof schema>, _extra: RequestHandl
 
     // A call with only selector fields would round-trip to OmniFocus and report success
     // having written nothing (#14). Refuse it before the script runs.
-    const hasMutation = MUTATION_FIELDS.some(key => (args as Record<string, unknown>)[key] !== undefined);
+    const hasMutation = MUTATION_FIELDS.some(key => args[key] !== undefined);
     if (!hasMutation) {
       return {
         content: [{
@@ -93,15 +94,21 @@ export async function handler(args: z.infer<typeof schema>, _extra: RequestHandl
       // Item was edited successfully
       const itemTypeLabel = args.itemType === 'task' ? 'Task' : 'Project';
       // Empty changedProperties means the script accepted the call but applied nothing
-      // (e.g. a project-only field sent for a task). Say so instead of implying a write.
-      const text = result.changedProperties
-        ? `✅ ${itemTypeLabel} "${result.name}" updated successfully (${result.changedProperties}).`
-        : `⚠️ ${itemTypeLabel} "${result.name}" (no changes) — the supplied fields did not apply to this ${args.itemType}.`;
+      // (e.g. a project-only field sent for a task). That is an error, not a write.
+      if (!result.changedProperties) {
+        return {
+          content: [{
+            type: "text" as const,
+            text: `⚠️ ${itemTypeLabel} "${result.name}" — no change was made: the supplied fields produced no change on this ${args.itemType}.`
+          }],
+          isError: true
+        };
+      }
 
       return {
         content: [{
           type: "text" as const,
-          text
+          text: `✅ ${itemTypeLabel} "${result.name}" updated successfully (${result.changedProperties}).`
         }]
       };
     } else {

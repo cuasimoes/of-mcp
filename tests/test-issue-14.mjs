@@ -3,7 +3,10 @@
 // no mutation field was supplied. Exercises the MCP definition handler (the
 // layer that formats the response), not just the primitive.
 //
-// Bundle + run (see agent notes): esbuild → dist/test-issue-14.mjs → node.
+// Bundle + run (after `npm run build:fast`, so dist/utils/omnifocusScripts/ exists):
+//   npx esbuild tests/test-issue-14.mjs --bundle --platform=node --format=esm \
+//     --external:@modelcontextprotocol/sdk --external:zod --outfile=dist/test-issue-14.mjs \
+//   && node dist/test-issue-14.mjs
 
 import { handler as editItemHandler } from '../src/tools/definitions/editItem.js';
 import { addOmniFocusTask } from '../src/tools/primitives/addOmniFocusTask.js';
@@ -58,7 +61,7 @@ async function main() {
     const ignored = await editItemHandler({ id: taskId, itemType: 'task', newSequential: true }, {});
     const ignoredText = ignored.content[0].text;
     console.log(`   response: ${JSON.stringify(ignoredText)} isError=${ignored.isError === true}`);
-    record('empty changedProperties reported as "(no changes)"', /\(no changes\)/.test(ignoredText), ignoredText);
+    record('empty changedProperties returns isError', ignored.isError === true && /no change was made/.test(ignoredText), ignoredText);
   } catch (err) {
     record('harness ran to completion', false, err.message);
   } finally {
@@ -69,7 +72,7 @@ async function main() {
     }
     if (projectId) {
       const r = await removeItem({ id: projectId, itemType: 'project' });
-      console.log(`   project removed: ${r.success} ${r.error || ''}`);
+      record('cleanup: project removed', r.success === true, r.error);
     }
     if (taskId) {
       const gone = await getTaskById({ taskId });

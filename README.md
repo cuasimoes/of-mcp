@@ -317,10 +317,6 @@ add_omnifocus_task {
   }
 }
 
-# NOTE: `id`/`name` only SELECT the item; mutations are the new*-prefixed fields
-# (newName, newStatus, newNote, ...). A call with no mutation field is rejected
-# as an error rather than reported as a successful edit.
-
 # Edit task to add/remove repetition
 edit_item {
   "id": "taskId123",
@@ -575,7 +571,7 @@ get_project_by_id {
 2. **add_project** - Create projects
 3. **add_folder** - Create folders (with nesting support)
 4. **remove_item** - Delete tasks or projects
-5. **edit_item** - Edit tasks or projects
+5. **edit_item** - Edit tasks or projects. `id`/`name` only *select* the item; mutations are the `new*`-prefixed fields (`newName`, `newStatus`, `newNote`, ...). A call with no mutation field, or one that produces no change, returns an error rather than a successful edit.
 6. **batch_add_items** - Bulk add tasks/projects (true batching - 9x faster)
 7. **batch_edit_items** - Bulk edit tasks/projects (true batching - 12x faster)
 8. **batch_remove_items** - Bulk remove (true batching - 9x faster)
