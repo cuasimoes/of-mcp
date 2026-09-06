@@ -78,7 +78,16 @@ export async function getTasksByTag(options: GetTasksByTagOptions): Promise<stri
           output += '\n';
         }
       }
-      
+
+      // Same name on more than one tag: results below merge all of them, say so (#11)
+      if (data.ambiguousSearchTerms && Object.keys(data.ambiguousSearchTerms).length > 0) {
+        Object.entries(data.ambiguousSearchTerms).forEach(([term, paths]) => {
+          const pathList = paths as string[];
+          output += `⚠️ **Ambiguous tag name** "${term}" matches ${pathList.length} tags: ${pathList.join(', ')}. `;
+          output += `Tasks from ALL of them are included below; pass tagId or a "Parent > Child" path in tagName to target one.\n\n`;
+        });
+      }
+
       if (data.tasks && Array.isArray(data.tasks)) {
         if (data.tasks.length === 0) {
           output += `No tasks found with tag ${searchTagsDisplay}\n`;

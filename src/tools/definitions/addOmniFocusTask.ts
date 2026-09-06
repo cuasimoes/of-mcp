@@ -16,7 +16,7 @@ export const schema = z.object({
   plannedDate: z.string().optional().describe("The planned date (when you intend to work on this) in ISO format (YYYY-MM-DD or full ISO date)"),
   flagged: z.boolean().optional().describe("Whether the task is flagged or not"),
   estimatedMinutes: z.number().optional().describe("Estimated time to complete the task, in minutes"),
-  tags: z.array(z.string()).optional().describe("Tags to assign to the task"),
+  tags: z.array(z.string()).optional().describe("Tags to assign to the task. Each entry may be a tag ID, a 'Parent > Child' path, or a plain name. Names match active tags only (never dropped ones) and are created if missing; an ID or path that does not resolve is an error."),
   projectName: z.string().optional().describe("The name of the project to add the task to (will add to inbox if not specified)"),
   projectId: z.string().optional().describe("The ID of the project to add the task to (alternative to projectName)"),
   parentTaskId: z.string().optional().describe("The ID of the parent task to create this task as a subtask"),
@@ -78,10 +78,14 @@ export async function handler(args: z.infer<typeof schema>, _extra: RequestHandl
         idText = ' (Note: ID not available - use search to find this task)';
       }
 
+      const warningText = result.warnings && result.warnings.length > 0
+        ? '\n' + result.warnings.map(w => `⚠️ ${w}`).join('\n')
+        : '';
+
       return {
         content: [{
           type: "text" as const,
-          text: `✅ Task "${args.name}"${idText} created successfully ${locationText}${dueDateText}${plannedDateText}${tagText}${repeatText}.`
+          text: `✅ Task "${args.name}"${idText} created successfully ${locationText}${dueDateText}${plannedDateText}${tagText}${repeatText}.${warningText}`
         }]
       };
     } else {

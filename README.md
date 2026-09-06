@@ -810,6 +810,18 @@ All tools support both name and ID parameters. **IDs are more reliable** because
 
 **Rule:** When both ID and name are provided, ID takes priority.
 
+### Tag References (names, IDs, paths)
+
+Tag names are not unique in OmniFocus — `Action > Training` and a dropped `Akamai > Training` can coexist. Every write field that takes tags (`tags` on `add_omnifocus_task` / `add_project` / `batch_add_items`, and `addTags` / `removeTags` / `replaceTags` on `edit_item` / `batch_edit_items`) resolves each entry as, in order:
+
+1. **Tag ID** (`"g02aqFORMEh"`) — exact match, any status
+2. **Path** (`"Action > Training"`) — walked from the top level, active tags only
+3. **Plain name** (`"Training"`) — active tags only; never matches a dropped tag. Created if missing.
+
+An ID-shaped string or a path that does not resolve is an error — it never becomes a literal tag name. When a plain name matches more than one active tag, the first is used and the response carries a warning listing every candidate path.
+
+`get_tasks_by_tag` with `tagName` returns tasks from **all** same-named tags and flags the name as ambiguous; pass a `Parent > Child` path (or `tagId`) to target one.
+
 ### Batch Operations for Writes
 
 Use batch tools for multiple write operations:

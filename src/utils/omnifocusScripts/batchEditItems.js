@@ -2,28 +2,6 @@
 // This provides true batching - all edits happen in one OmniFocus session
 // Note: parseLocalDate and buildRRule are provided by sharedUtils.js
 (() => {
-  // Build tag lookup Map once for O(1) lookups (instead of O(n) per lookup)
-  const tagLookupMap = new Map();
-  flattenedTags.forEach(tag => tagLookupMap.set(tag.name.toLowerCase(), tag));
-
-  // Helper function to find a tag by name (uses cached Map for O(1) lookup)
-  // If tag doesn't exist, creates it and adds to cache
-  function findOrCreateTag(tagName) {
-    const tagNameLower = tagName.toLowerCase();
-    let tag = tagLookupMap.get(tagNameLower);
-    if (!tag) {
-      // Tag doesn't exist - create it and cache it
-      tag = new Tag(tagName);
-      tagLookupMap.set(tagNameLower, tag);
-    }
-    return tag;
-  }
-
-  // Helper function to find a tag by name (for removal - don't create if missing)
-  function findTag(tagName) {
-    return tagLookupMap.get(tagName.toLowerCase()) || null;
-  }
-
   try {
     const args = typeof injectedArgs !== 'undefined' ? injectedArgs : {};
     const edits = args.edits || [];
@@ -144,6 +122,32 @@
         const changedProperties = [];
         const originalName = foundItem.name;
         const originalId = foundItem.id.primaryKey;
+
+        // Resolve tag references (ID / "Parent > Child" path / active name) up front so
+        // an unresolvable reference fails this edit before any property is changed
+        const resolvedTagOps = {};
+        let tagWarnings = [];
+        let tagError = null;
+        for (const [field, createIfMissing] of [['replaceTags', true], ['addTags', true], ['removeTags', false]]) {
+          if (edit[field] && edit[field].length > 0) {
+            const tagResolution = resolveTagRefs(edit[field], { createIfMissing });
+            if (tagResolution.errors.length > 0) {
+              tagError = tagResolution.errors.join('; ');
+              break;
+            }
+            resolvedTagOps[field] = tagResolution.tags;
+            tagWarnings = tagWarnings.concat(tagResolution.warnings);
+          }
+        }
+        if (tagError) {
+          results.push({
+            success: false,
+            id: originalId,
+            name: originalName,
+            error: tagError
+          });
+          continue;
+        }
 
         // Apply changes (same logic as editItem.js)
 
@@ -268,30 +272,27 @@
         }
 
         // Replace all tags (tasks and projects both support tags)
-        if (edit.replaceTags && edit.replaceTags.length > 0) {
+        if (resolvedTagOps.replaceTags) {
           const existingTags = foundItem.tags.slice();
           for (const existingTag of existingTags) {
             foundItem.removeTag(existingTag);
           }
-          for (const tagName of edit.replaceTags) {
-            const tag = findOrCreateTag(tagName);
+          for (const tag of resolvedTagOps.replaceTags) {
             foundItem.addTag(tag);
           }
           changedProperties.push("tags (replaced)");
         } else {
           // Add tags (tasks and projects both support tags)
-          if (edit.addTags && edit.addTags.length > 0) {
-            for (const tagName of edit.addTags) {
-              const tag = findOrCreateTag(tagName);
+          if (resolvedTagOps.addTags) {
+            for (const tag of resolvedTagOps.addTags) {
               foundItem.addTag(tag);
             }
             changedProperties.push("tags (added)");
           }
           // Remove tags (tasks and projects both support tags)
-          if (edit.removeTags && edit.removeTags.length > 0) {
-            for (const tagName of edit.removeTags) {
-              const tag = findTag(tagName);
-              if (tag) foundItem.removeTag(tag);
+          if (resolvedTagOps.removeTags) {
+            for (const tag of resolvedTagOps.removeTags) {
+              foundItem.removeTag(tag);
             }
             changedProperties.push("tags (removed)");
           }
@@ -391,12 +392,16 @@
           }
         }
 
-        results.push({
+        const editResult = {
           success: true,
           id: originalId,
           name: originalName,
           changedProperties: changedProperties.join(", ")
-        });
+        };
+        if (tagWarnings.length > 0) {
+          editResult.warnings = tagWarnings;
+        }
+        results.push(editResult);
 
       } catch (itemError) {
         results.push({

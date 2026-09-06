@@ -53,6 +53,22 @@
       }
     }
 
+    // Resolve tag references (ID / "Parent > Child" path / active name) before
+    // creating anything so an unresolvable reference fails without a stray project
+    let resolvedTags = [];
+    let tagWarnings = [];
+    if (tagNames && tagNames.length > 0) {
+      const tagResolution = resolveTagRefs(tagNames, { createIfMissing: true });
+      if (tagResolution.errors.length > 0) {
+        return JSON.stringify({
+          success: false,
+          error: tagResolution.errors.join('; ')
+        });
+      }
+      resolvedTags = tagResolution.tags;
+      tagWarnings = tagResolution.warnings;
+    }
+
     // Create the new project
     let newProject;
     if (container) {
@@ -90,23 +106,19 @@
     newProject.sequential = sequential;
 
     // Add tags
-    if (tagNames && tagNames.length > 0) {
-      const allTags = flattenedTags;
-      for (const tagName of tagNames) {
-        for (const tag of allTags) {
-          if (tag.name === tagName) {
-            newProject.addTag(tag);
-            break;
-          }
-        }
-      }
+    for (const tag of resolvedTags) {
+      newProject.addTag(tag);
     }
 
-    return JSON.stringify({
+    const result = {
       success: true,
       projectId: newProject.id.primaryKey,
       name: newProject.name
-    });
+    };
+    if (tagWarnings.length > 0) {
+      result.warnings = tagWarnings;
+    }
+    return JSON.stringify(result);
 
   } catch (error) {
     return JSON.stringify({

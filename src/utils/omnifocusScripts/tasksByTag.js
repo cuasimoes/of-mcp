@@ -35,6 +35,7 @@
       matchMode: matchMode,
       exactMatch: exactMatch,
       matchedTagsBySearchTerm: {},
+      ambiguousSearchTerms: {},
       tasks: [],
       availableTags: []
     };
@@ -64,21 +65,32 @@
         console.log(`Search ID "${searchId}" matched ${matches.length} tags: ${matches.map(t => t.name).join(', ')}`);
       });
     } else {
-      // Search by name
+      // Search by name; a "Parent > Child" term matches the full path exactly (#11)
       tagNames.forEach(searchTerm => {
+        const termLower = searchTerm.toLowerCase();
         let matches;
-        if (exactMatch) {
-          matches = allTags.filter(tag =>
-            tag.name.toLowerCase() === searchTerm.toLowerCase()
-          );
+        if (termLower.indexOf(' > ') !== -1) {
+          matches = allTags.filter(tag => getTagPath(tag).toLowerCase() === termLower);
+        } else if (exactMatch) {
+          matches = allTags.filter(tag => tag.name.toLowerCase() === termLower);
         } else {
-          matches = allTags.filter(tag =>
-            tag.name.toLowerCase().includes(searchTerm.toLowerCase())
-          );
+          matches = allTags.filter(tag => tag.name.toLowerCase().includes(termLower));
         }
         matchingTagsBySearchTerm.set(searchTerm, matches);
-        exportData.matchedTagsBySearchTerm[searchTerm] = matches.map(t => t.name);
-        console.log(`Search term "${searchTerm}" matched ${matches.length} tags: ${matches.map(t => t.name).join(', ')}`);
+        // Report full paths so same-named tags are distinguishable in the output
+        const matchedPaths = matches.map(getTagPath);
+        exportData.matchedTagsBySearchTerm[searchTerm] = matchedPaths;
+        // Same name on more than one matched tag = the term is ambiguous; tasks from
+        // every match are returned, but the caller needs to know the name is not unique
+        const nameCounts = new Map();
+        matches.forEach(t => nameCounts.set(t.name.toLowerCase(), (nameCounts.get(t.name.toLowerCase()) || 0) + 1));
+        const duplicateNames = Array.from(nameCounts.entries()).filter(([, n]) => n > 1);
+        if (duplicateNames.length > 0) {
+          exportData.ambiguousSearchTerms[searchTerm] = matches
+            .filter(t => nameCounts.get(t.name.toLowerCase()) > 1)
+            .map(getTagPath);
+        }
+        console.log(`Search term "${searchTerm}" matched ${matches.length} tags: ${matchedPaths.join(', ')}`);
       });
     }
 

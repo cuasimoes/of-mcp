@@ -152,6 +152,113 @@ function resolveFolderByName(folderName, allFolders) {
 }
 
 /**
+ * Build the full ancestor path for a tag (e.g. "Work > Errands").
+ * @param {Tag} tag - An OmniFocus Tag object
+ * @returns {string} - Full path with " > " separators
+ */
+function getTagPath(tag) {
+  try {
+    const parts = [];
+    let current = tag;
+    while (current) {
+      parts.unshift(current.name);
+      current = current.parent || null;
+    }
+    return parts.join(' > ');
+  } catch (e) {
+    return tag.name;
+  }
+}
+
+// OmniFocus object identifiers are 11 URL-safe base64 characters
+const TAG_ID_PATTERN = /^[A-Za-z0-9_-]{11}$/;
+
+/**
+ * Resolve tag references for write paths (`tags` on add, addTags/removeTags/replaceTags).
+ *
+ * Each entry is tried, in order, as an exact tag ID, a "Parent > Child" path walked
+ * from the top level, then a plain name. Names and paths only match ACTIVE tags
+ * (case-insensitive) so a dropped tag is never re-attached by name (#5); IDs match
+ * any tag. An ID-shaped string or a path that fails to resolve is an error rather
+ * than a new literal tag (#7). Plain names that match nothing are created when
+ * `createIfMissing` is set — but only after every entry has resolved, so a bad
+ * entry never leaves half the tags created.
+ *
+ * @param {string[]} refs - Tag IDs, paths, or names
+ * @param {{createIfMissing?: boolean}} [options]
+ * @returns {{tags: Tag[], errors: string[], warnings: string[]}} - `tags` is empty when `errors` is non-empty
+ */
+function resolveTagRefs(refs, options) {
+  const createIfMissing = !!(options && options.createIfMissing);
+  const resolved = [];
+  const errors = [];
+  const warnings = [];
+
+  for (const rawRef of refs) {
+    const ref = String(rawRef).trim();
+    if (!ref) continue;
+
+    let tag = null;
+    try { tag = Tag.byIdentifier(ref); } catch (e) { tag = null; }
+    if (tag) {
+      resolved.push({ tag: tag });
+      continue;
+    }
+
+    if (ref.indexOf(' > ') !== -1) {
+      const segments = ref.split(' > ').map(function(s) { return s.trim().toLowerCase(); });
+      let level = flattenedTags.filter(function(t) { return !t.parent; });
+      for (const segment of segments) {
+        const matches = level.filter(function(t) { return t.active && t.name.toLowerCase() === segment; });
+        tag = matches.length > 0 ? matches[0] : null;
+        if (!tag) break;
+        level = tag.children;
+      }
+      if (tag) {
+        resolved.push({ tag: tag });
+      } else {
+        errors.push(`Tag path not found: "${ref}"`);
+      }
+      continue;
+    }
+
+    const nameLower = ref.toLowerCase();
+    const activeMatches = [];
+    let droppedMatch = false;
+    for (const t of flattenedTags) {
+      if (t.name.toLowerCase() !== nameLower) continue;
+      if (t.active) activeMatches.push(t); else droppedMatch = true;
+    }
+    if (activeMatches.length > 0) {
+      if (activeMatches.length > 1) {
+        warnings.push(`Tag name "${ref}" is ambiguous (${activeMatches.map(getTagPath).join('; ')}); used "${getTagPath(activeMatches[0])}". Pass a tag ID or "Parent > Child" path to disambiguate.`);
+      }
+      resolved.push({ tag: activeMatches[0] });
+    } else if (TAG_ID_PATTERN.test(ref)) {
+      errors.push(`Tag not found with ID or name "${ref}"`);
+    } else if (createIfMissing) {
+      resolved.push({ createName: ref });
+      if (droppedMatch) {
+        warnings.push(`Tag "${ref}" only matched a dropped tag; created a new active tag instead of reusing it.`);
+      }
+    }
+  }
+
+  if (errors.length > 0) {
+    return { tags: [], errors: errors, warnings: warnings };
+  }
+
+  const createdByName = new Map();
+  const tags = resolved.map(function(entry) {
+    if (entry.tag) return entry.tag;
+    const key = entry.createName.toLowerCase();
+    if (!createdByName.has(key)) createdByName.set(key, new Tag(entry.createName));
+    return createdByName.get(key);
+  });
+  return { tags: tags, errors: errors, warnings: warnings };
+}
+
+/**
  * Map of OmniFocus Task.Status enum values to human-readable strings.
  * Used for serializing task status in JSON responses.
  */

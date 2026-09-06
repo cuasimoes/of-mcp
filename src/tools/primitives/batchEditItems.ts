@@ -55,6 +55,7 @@ interface EditResult {
   id?: string;
   name?: string;
   changedProperties?: string;
+  warnings?: string[];
   error?: string;
 }
 

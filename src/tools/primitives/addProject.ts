@@ -22,7 +22,7 @@ export interface AddProjectParams {
  * Add a project to OmniFocus
  * Uses OmniJS to correctly parse ISO date formats and handle special characters
  */
-export async function addProject(params: AddProjectParams): Promise<{success: boolean, projectId?: string, error?: string}> {
+export async function addProject(params: AddProjectParams): Promise<{success: boolean, projectId?: string, warnings?: string[], error?: string}> {
   try {
     // Validate parameters
     if (!params.name) {
@@ -70,7 +70,8 @@ export async function addProject(params: AddProjectParams): Promise<{success: bo
       queryCache.invalidateOnWrite();
       return {
         success: true,
-        projectId: parsed.projectId
+        projectId: parsed.projectId,
+        warnings: parsed.warnings
       };
     } else {
       return {

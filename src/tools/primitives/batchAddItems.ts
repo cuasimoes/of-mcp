@@ -100,6 +100,7 @@ type ItemResult = {
   type?: string;
   id?: string;
   name?: string;
+  warnings?: string[];
   error?: string;
 };
 

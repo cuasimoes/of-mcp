@@ -18,7 +18,6 @@
     let projectsById = null;
     let tasksByName = null;
     let tasksById = null;
-    let tagsByName = null;
     let cachedFolders = null;
     let foldersById = null;
 
@@ -58,12 +57,20 @@
       return tasksByName;
     }
 
-    function getTagsByName() {
-      if (!tagsByName) {
-        tagsByName = new Map();
-        flattenedTags.forEach(t => tagsByName.set(t.name.toLowerCase(), t));
+    // Resolve tag references (ID / "Parent > Child" path / active name) for one
+    // item. Returns null after pushing a failure result if any reference is bad.
+    function resolveItemTags(tagNames, itemName) {
+      if (!tagNames || tagNames.length === 0) return { tags: [], warnings: [] };
+      const tagResolution = resolveTagRefs(tagNames, { createIfMissing: true });
+      if (tagResolution.errors.length > 0) {
+        results.push({
+          success: false,
+          name: itemName,
+          error: tagResolution.errors.join('; ')
+        });
+        return null;
       }
-      return tagsByName;
+      return tagResolution;
     }
 
     function getAllFolders() {
@@ -191,6 +198,10 @@
             }
           }
 
+          // Resolve tags before creating the task so a bad reference leaves nothing behind
+          const taskTags = resolveItemTags(tagNames, itemName);
+          if (!taskTags) continue;
+
           // Create the task
           let newTask;
           if (containerType === 'inbox') {
@@ -210,13 +221,9 @@
           if (flagged) newTask.flagged = true;
           if (estimatedMinutes) newTask.estimatedMinutes = estimatedMinutes;
 
-          // Add tags (only load tags collection if needed)
-          if (tagNames && tagNames.length > 0) {
-            const tags = getTagsByName();
-            for (const tagName of tagNames) {
-              const tag = tags.get(tagName.toLowerCase());
-              if (tag) newTask.addTag(tag);
-            }
+          // Add tags
+          for (const tag of taskTags.tags) {
+            newTask.addTag(tag);
           }
 
           // Set repetition rule
@@ -253,6 +260,9 @@
           if (repetitionWarning) {
             taskResult.warning = repetitionWarning;
           }
+          if (taskTags.warnings.length > 0) {
+            taskResult.warnings = taskTags.warnings;
+          }
           results.push(taskResult);
 
         } else if (itemType === 'project') {
@@ -287,6 +297,10 @@
             }
           }
 
+          // Resolve tags before creating the project so a bad reference leaves nothing behind
+          const projectTags = resolveItemTags(tagNames, itemName);
+          if (!projectTags) continue;
+
           // Create the project
           let newProject;
           if (container) {
@@ -303,13 +317,9 @@
           if (estimatedMinutes) newProject.estimatedMinutes = estimatedMinutes;
           newProject.sequential = sequential;
 
-          // Add tags (only load tags collection if needed)
-          if (tagNames && tagNames.length > 0) {
-            const tags = getTagsByName();
-            for (const tagName of tagNames) {
-              const tag = tags.get(tagName.toLowerCase());
-              if (tag) newProject.addTag(tag);
-            }
+          // Add tags
+          for (const tag of projectTags.tags) {
+            newProject.addTag(tag);
           }
 
           // Store in tempIdMap for intra-batch references (tasks can reference project)
@@ -325,6 +335,9 @@
           };
           if (item.tempId) {
             projectResult.tempId = item.tempId;
+          }
+          if (projectTags.warnings.length > 0) {
+            projectResult.warnings = projectTags.warnings;
           }
           results.push(projectResult);
 

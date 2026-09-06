@@ -14,7 +14,7 @@ export const schema = z.object({
   deferDate: z.string().optional().describe("The defer date of the project in ISO format (YYYY-MM-DD or full ISO date)"),
   flagged: z.boolean().optional().describe("Whether the project is flagged or not"),
   estimatedMinutes: z.number().optional().describe("Estimated time to complete the project, in minutes"),
-  tags: z.array(z.string()).optional().describe("Tags to assign to the project"),
+  tags: z.array(z.string()).optional().describe("Tags to assign to the project. Each entry may be a tag ID, a 'Parent > Child' path, or a plain name. Names match active tags only (never dropped ones) and are created if missing; an ID or path that does not resolve is an error."),
   folderName: z.string().optional().describe("The name of the folder to add the project to (will add to root if not specified)"),
   folderId: z.string().optional().describe("The ID of the folder to add the project to (alternative to folderName)"),
   sequential: z.boolean().optional().describe("Whether tasks in the project should be sequential (default: false)")
@@ -57,10 +57,14 @@ export async function handler(args: z.infer<typeof schema>, _extra: RequestHandl
         idText = ' (Note: ID not available - use list_projects to find this project)';
       }
 
+      const warningText = result.warnings && result.warnings.length > 0
+        ? '\n' + result.warnings.map(w => `⚠️ ${w}`).join('\n')
+        : '';
+
       return {
         content: [{
           type: "text" as const,
-          text: `✅ Project "${args.name}"${idText} created successfully ${locationText}${dueDateText}${tagText}${sequentialText}.`
+          text: `✅ Project "${args.name}"${idText} created successfully ${locationText}${dueDateText}${tagText}${sequentialText}.${warningText}`
         }]
       };
     } else {

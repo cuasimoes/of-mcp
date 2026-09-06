@@ -22,9 +22,9 @@ export const schema = z.object({
   newEstimatedMinutes: z.number().optional().describe("New estimated minutes"),
   
   // Tag operations (work on both tasks and projects)
-  addTags: z.array(z.string()).optional().describe("Tags to add (works on both tasks and projects)"),
-  removeTags: z.array(z.string()).optional().describe("Tags to remove (works on both tasks and projects)"),
-  replaceTags: z.array(z.string()).optional().describe("Replace all existing tags (works on both tasks and projects)"),
+  addTags: z.array(z.string()).optional().describe("Tags to add (works on both tasks and projects). Each entry may be a tag ID, a 'Parent > Child' path, or a plain name. Names match active tags only (never dropped ones) and are created if missing; an ID or path that does not resolve is an error."),
+  removeTags: z.array(z.string()).optional().describe("Tags to remove (works on both tasks and projects). Accepts tag IDs, 'Parent > Child' paths, or plain names (active tags only)."),
+  replaceTags: z.array(z.string()).optional().describe("Replace all existing tags (works on both tasks and projects). Same reference rules as addTags: tag ID, 'Parent > Child' path, or plain name."),
 
   // Task-specific fields
   newStatus: z.enum(['incomplete', 'completed', 'dropped']).optional().describe("New status for tasks (incomplete, completed, dropped)"),
@@ -79,11 +79,15 @@ export async function handler(args: z.infer<typeof schema>, _extra: RequestHandl
       if (result.changedProperties) {
         changedText = ` (${result.changedProperties})`;
       }
-      
+
+      const warningText = result.warnings && result.warnings.length > 0
+        ? '\n' + result.warnings.map(w => `⚠️ ${w}`).join('\n')
+        : '';
+
       return {
         content: [{
           type: "text" as const,
-          text: `✅ ${itemTypeLabel} "${result.name}" updated successfully${changedText}.`
+          text: `✅ ${itemTypeLabel} "${result.name}" updated successfully${changedText}.${warningText}`
         }]
       };
     } else {

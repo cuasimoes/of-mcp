@@ -16,7 +16,7 @@ export const schema = z.object({
     plannedDate: z.string().optional().describe("The planned date in ISO format (YYYY-MM-DD or full ISO date)"),
     flagged: z.boolean().optional().describe("Whether the item is flagged or not"),
     estimatedMinutes: z.number().optional().describe("Estimated time to complete the item, in minutes"),
-    tags: z.array(z.string()).optional().describe("Tags to assign to the item"),
+    tags: z.array(z.string()).optional().describe("Tags to assign to the item. Each entry may be a tag ID, a 'Parent > Child' path, or a plain name. Names match active tags only (never dropped ones) and are created if missing; an ID or path that does not resolve fails this item."),
 
     // Intra-batch references for hierarchical creation
     tempId: z.string().optional().describe("Temporary ID for this item within the batch - used to reference this item as a parent for other items"),
@@ -63,7 +63,10 @@ export async function handler(args: z.infer<typeof schema>, _extra: RequestHandl
             });
             idText = ' (Note: ID not available)';
           }
-          return `- ✅ ${item.type}: "${item.name}"${idText}`;
+          const warningText = item.warnings && item.warnings.length > 0
+            ? ` ⚠️ ${item.warnings.join(' ')}`
+            : '';
+          return `- ✅ ${item.type}: "${item.name}"${idText}${warningText}`;
         } else {
           return `- ❌ ${item.type || 'item'}: "${item.name || 'unknown'}" - Error: ${item.error}`;
         }
