@@ -11,6 +11,7 @@
 import { handler as editItemHandler } from '../src/tools/definitions/editItem.js';
 import { addOmniFocusTask } from '../src/tools/primitives/addOmniFocusTask.js';
 import { addProject } from '../src/tools/primitives/addProject.js';
+import { getProjectById } from '../src/tools/primitives/getProjectById.js';
 import { getTaskById } from '../src/tools/primitives/getTaskById.js';
 import { removeItem } from '../src/tools/primitives/removeItem.js';
 
@@ -57,11 +58,16 @@ async function main() {
     const afterRename = await getTaskById({ taskId });
     record('task actually renamed', afterRename.success && afterRename.task.name === RENAMED, afterRename.task?.name);
 
-    console.log('\n4. edit_item with a mutation field OmniFocus ignores for tasks (newSequential)...');
-    const ignored = await editItemHandler({ id: taskId, itemType: 'task', newSequential: true }, {});
+    // newStatus is a task-only field (editItem.js guards it with itemType === 'task'), so
+    // sending it for a project is a stable no-op: the script runs and changes nothing.
+    console.log('\n4. edit_item with a mutation field the script ignores for projects (newStatus)...');
+    const ignored = await editItemHandler({ id: projectId, itemType: 'project', newStatus: 'completed' }, {});
     const ignoredText = ignored.content[0].text;
     console.log(`   response: ${JSON.stringify(ignoredText)} isError=${ignored.isError === true}`);
     record('empty changedProperties returns isError', ignored.isError === true && /no change was made/.test(ignoredText), ignoredText);
+
+    const projAfter = await getProjectById({ projectId });
+    record('project status unchanged (still active)', projAfter.success && /^active$/i.test(projAfter.project.status), projAfter.project?.status);
   } catch (err) {
     record('harness ran to completion', false, err.message);
   } finally {
