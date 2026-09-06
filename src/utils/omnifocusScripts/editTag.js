@@ -98,15 +98,10 @@
         checkParent = checkParent.parent;
       }
 
-      // moveTo handles both setting parent and moving to top level
-      if (newParent) {
-        tag.moveTo(newParent.ending);
-        changes.parent = newParent.name;
-      } else {
-        // Move to top level
-        tag.moveTo(tags.ending);
-        changes.parent = null;
-      }
+      // Tag has no moveTo(); reparenting is done with the global moveTags().
+      // moveTags rejects a null position, so top level = the end of the root tag list.
+      moveTags([tag], newParent ? newParent : tags.ending);
+      changes.parent = newParent ? newParent.name : null;
     }
 
     if (allowsNextAction !== undefined && tag.allowsNextAction !== allowsNextAction) {
