@@ -51,6 +51,15 @@ function check(test, passed, detail) {
   console.log(`${passed ? '  PASS' : '  FAIL'} ${test}${detail ? ` — ${detail}` : ''}`);
 }
 
+// tagState() returns null for a missing tag; record that as a failure and hand back an
+// empty state so the caller's follow-up checks fail cleanly instead of throwing.
+async function tagStateOrFail(name, label) {
+  const s = await tagState(name);
+  if (s) return s;
+  check(`${label}: tag ${name} exists`, false, 'not found');
+  return { id: null, parent: undefined, taskNames: [] };
+}
+
 async function main() {
   console.log('='.repeat(60));
   console.log('ISSUE #6: edit_tag move to new parent / top level');
@@ -59,9 +68,10 @@ async function main() {
   // Refuse to run on top of leftovers from an earlier run — they'd confuse the assertions.
   const leftovers = await omniJS(`(() => JSON.stringify({
     tags: flattenedTags.filter(t => t.name.startsWith('_oftest-6-')).map(t => t.name),
-    projects: flattenedProjects.filter(p => p.name === ${JSON.stringify(PROJECT_NAME)}).map(p => p.name)
+    projects: flattenedProjects.filter(p => p.name === ${JSON.stringify(PROJECT_NAME)}).map(p => p.name),
+    tasks: flattenedTasks.filter(t => t.name.startsWith('_oftest-6')).map(t => t.name)
   }))()`);
-  if (leftovers.tags.length || leftovers.projects.length) {
+  if (leftovers.tags.length || leftovers.projects.length || leftovers.tasks.length) {
     console.error('Leftover test data present, clean up first:', leftovers);
     process.exit(2);
   }
@@ -87,7 +97,7 @@ async function main() {
     if (!task.success) throw new Error(`addOmniFocusTask failed: ${task.error}`);
     taskId = task.taskId;
 
-    let s = await tagState(CHILD);
+    let s = await tagStateOrFail(CHILD, 'lookup');
     check('setup: child under parent with task attached',
       s.parent === PARENT && s.taskNames.includes(TASK_NAME), JSON.stringify(s));
 
@@ -100,7 +110,7 @@ async function main() {
     } catch (err) {
       check('move by name: editTag succeeds', false, err.message);
     }
-    s = await tagState(CHILD);
+    s = await tagStateOrFail(CHILD, 'lookup');
     check('move by name: child.parent is other', s.parent === OTHER, `parent=${s.parent}`);
     check('move by name: task still tagged', s.taskNames.includes(TASK_NAME), JSON.stringify(s.taskNames));
 
@@ -113,7 +123,7 @@ async function main() {
     } catch (err) {
       check('top level: editTag succeeds', false, err.message);
     }
-    s = await tagState(CHILD);
+    s = await tagStateOrFail(CHILD, 'lookup');
     check('top level: child.parent is null', s.parent === null, `parent=${s.parent}`);
     check('top level: task still tagged', s.taskNames.includes(TASK_NAME), JSON.stringify(s.taskNames));
 
@@ -126,12 +136,24 @@ async function main() {
     } catch (err) {
       check('move by id: editTag succeeds', false, err.message);
     }
-    s = await tagState(CHILD);
+    s = await tagStateOrFail(CHILD, 'lookup');
     check('move by id: child.parent is parent', s.parent === PARENT, `parent=${s.parent}`);
     check('move by id: task still tagged', s.taskNames.includes(TASK_NAME), JSON.stringify(s.taskNames));
 
-    // 4. Cycle guard still works
-    console.log('\n4. editTag: parent under child must be rejected');
+    // 4. Re-sending the current parent is a no-op: no move, no parent change reported
+    console.log('\n4. editTag: re-send current parent (idempotent)');
+    try {
+      const out = await editTag({ tagId: ids.child, newParentTagId: ids.parent });
+      console.log('   ' + out.replace(/\n/g, '\n   '));
+      check('idempotent: no parent change reported', !out.includes('parent →'), out.split('\n')[1] || '(no changes)');
+    } catch (err) {
+      check('idempotent: editTag succeeds', false, err.message);
+    }
+    s = await tagStateOrFail(CHILD, 'lookup');
+    check('idempotent: child.parent still parent', s.parent === PARENT, `parent=${s.parent}`);
+
+    // 5. Cycle guard still works
+    console.log('\n5. editTag: parent under child must be rejected');
     try {
       await editTag({ tagId: ids.parent, newParentTagId: ids.child });
       check('cycle guard: rejected', false, 'no error thrown');
