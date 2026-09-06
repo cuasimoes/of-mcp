@@ -14,18 +14,28 @@ npm run dev
 # Start the server
 npm run start
 
+# Typecheck only (~1s)
+npm run typecheck
+
 # Run the automated unit tests
-# (esbuild-transpiles the pure date utils, then runs node:test; no full tsc
-#  build or OmniFocus needed — esbuild is used because the full tsc build is
-#  known to hang/OOM on some systems, see build:fast)
+# (esbuild-transpiles the pure date utils, then runs node:test; needs neither a
+#  full build nor OmniFocus)
 npm test
 
-# OmniFocus integration scripts (tests/test-*.mjs) still require manual runs
-# against a live OmniFocus, e.g.:
-node tests/test-review-feature.mjs
+# OmniFocus integration scripts (tests/test-*.mjs) require manual runs against a
+# live OmniFocus, and import the UNBUNDLED tree — run build:tsc first, since
+# `npm run build` produces only a bundled dist/server.js:
+npm run build:tsc && node tests/test-planned-date.mjs
 ```
 
-The build process compiles TypeScript to JavaScript and copies OmniJS script files to the dist directory.
+`npm run build` typechecks and then bundles to a single `dist/server.js` with esbuild.
+`npm run build:tsc` emits the unbundled per-file tree instead (`dist/tools/…`), which is
+what the integration harnesses import. Both copy the OmniJS script files into `dist/`.
+
+`tsc` used to OOM on this repo, and this file previously said so. That is fixed —
+the cause was `"moduleResolution": "node"` in `tsconfig.json`. Do not route around
+`npm run build`; if it fails, that is a real type error. See
+`docs/TSC_OOM_TROUBLESHOOTING.md`.
 
 ## Architecture Overview
 

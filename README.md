@@ -59,11 +59,8 @@ Enhanced Model Context Protocol (MCP) server for OmniFocus featuring **project r
    npm install && npm run build
    ```
 
-   **Alternative build** (if `npm run build` hangs or runs out of memory):
-   ```bash
-   npm run build:fast
-   ```
-   This uses esbuild (~14ms) instead of tsc. See [Troubleshooting](#troubleshooting) for details.
+   `npm run build` typechecks (`tsc --noEmit`, ~1s) and then bundles with esbuild.
+   To skip the typecheck, use `npm run build:fast`.
 
 2. Add to Claude Code:
    ```bash
@@ -885,10 +882,14 @@ filter_tasks {
 ### Troubleshooting
 
 **Build issues:**
-- If `npm run build` hangs or crashes with OOM, use `npm run build:fast` instead
-- The `build:fast` script uses esbuild which skips type checking but produces identical output
-- This can happen due to complex type inference in the MCP SDK and Zod dependencies
-- For type checking, run `npx tsc --noEmit` separately or rely on your IDE
+- `npm run build` runs `npm run typecheck` (`tsc --noEmit`, ~1s) and then bundles with esbuild
+- `npm run build:fast` skips the typecheck; `npm run build:tsc` emits the unbundled tree,
+  which the `tests/test-*.mjs` OmniFocus integration harnesses import from
+- `tsc` used to OOM here and could not complete. That is fixed — the cause was
+  `"moduleResolution": "node"` in `tsconfig.json`, not, as previously documented,
+  the complexity of the MCP SDK and Zod types. If it recurs, check that
+  `tsconfig.json` still sets `"module"`/`"moduleResolution"` to `NodeNext`, and see
+  [docs/TSC_OOM_TROUBLESHOOTING.md](docs/TSC_OOM_TROUBLESHOOTING.md)
 
 **Runtime issues:**
 - Ensure OmniFocus 3+ is installed and running

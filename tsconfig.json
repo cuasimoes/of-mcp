@@ -1,8 +1,13 @@
 {
   "compilerOptions": {
     "target": "ES2022",
-    "module": "ES2022",
-    "moduleResolution": "node",
+    // NodeNext, not the legacy "node" algorithm: node10 resolution ignores
+    // package.json "exports" maps, which made `zod` and the SDK's `zod/v3`
+    // import resolve to two separate declaration trees (.d.cts vs .d.ts).
+    // Comparing them structurally cost >10M type instantiations per
+    // server.tool() call and OOM'd tsc. See docs/TSC_OOM_TROUBLESHOOTING.md.
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
     "esModuleInterop": true,
     "strict": true,
     "skipLibCheck": true,
