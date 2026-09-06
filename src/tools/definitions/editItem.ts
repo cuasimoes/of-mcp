@@ -22,9 +22,9 @@ export const schema = z.object({
   newEstimatedMinutes: z.number().optional().describe("New estimated minutes"),
   
   // Tag operations (work on both tasks and projects)
-  addTags: z.array(z.string()).optional().describe("Tags to add (works on both tasks and projects)"),
-  removeTags: z.array(z.string()).optional().describe("Tags to remove (works on both tasks and projects)"),
-  replaceTags: z.array(z.string()).optional().describe("Replace all existing tags (works on both tasks and projects)"),
+  addTags: z.array(z.string()).optional().describe("Tags to add (works on both tasks and projects). Each entry may be a tag ID, a 'Parent > Child' path, or a plain name. Names match active tags only (never dropped ones) and are created if missing; an ID or path that does not resolve is an error."),
+  removeTags: z.array(z.string()).optional().describe("Tags to remove (works on both tasks and projects). Resolved against the item's OWN tags — tag ID, 'Parent > Child' path, or plain name, any status, so a dropped tag can be removed by name. A reference that is not on the item is reported as a warning and removes nothing."),
+  replaceTags: z.array(z.string()).optional().describe("Replace all existing tags (works on both tasks and projects). Same reference rules as addTags: tag ID, 'Parent > Child' path, or plain name."),
 
   // Task-specific fields
   newStatus: z.enum(['incomplete', 'completed', 'dropped']).optional().describe("New status for tasks (incomplete, completed, dropped)"),
@@ -95,11 +95,17 @@ export async function handler(args: z.infer<typeof schema>, _extra: RequestHandl
       const itemTypeLabel = args.itemType === 'task' ? 'Task' : 'Project';
       // Empty changedProperties means the script accepted the call but applied nothing
       // (e.g. a project-only field sent for a task). That is an error, not a write.
+      // Warnings explain WHY nothing changed (e.g. a removeTags reference that is
+      // not on the item), so they belong on the no-change path too.
+      const warningText = result.warnings && result.warnings.length > 0
+        ? '\n' + result.warnings.map(w => `⚠️ ${w}`).join('\n')
+        : '';
+
       if (!result.changedProperties) {
         return {
           content: [{
             type: "text" as const,
-            text: `⚠️ ${itemTypeLabel} "${result.name}" — no change was made: the supplied fields produced no change on this ${args.itemType}.`
+            text: `⚠️ ${itemTypeLabel} "${result.name}" — no change was made: the supplied fields produced no change on this ${args.itemType}.${warningText}`
           }],
           isError: true
         };
@@ -108,7 +114,7 @@ export async function handler(args: z.infer<typeof schema>, _extra: RequestHandl
       return {
         content: [{
           type: "text" as const,
-          text: `✅ ${itemTypeLabel} "${result.name}" updated successfully (${result.changedProperties}).`
+          text: `✅ ${itemTypeLabel} "${result.name}" updated successfully (${result.changedProperties}).${warningText}`
         }]
       };
     } else {

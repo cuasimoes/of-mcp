@@ -4,7 +4,7 @@ import { RequestHandlerExtra } from '@modelcontextprotocol/sdk/shared/protocol.j
 import { ServerRequest, ServerNotification } from '@modelcontextprotocol/sdk/types.js';
 
 export const schema = z.object({
-  tagName: z.union([z.string(), z.array(z.string())]).optional().describe("Name of tag(s) to filter tasks by. Can be a single tag or array of tags (e.g., ['work', 'urgent'])"),
+  tagName: z.union([z.string(), z.array(z.string())]).optional().describe("Name of tag(s) to filter tasks by. Can be a single tag or array of tags (e.g., ['work', 'urgent']). When several tags share a name, tasks from ALL of them are returned and the output flags the name as ambiguous; pass a 'Parent > Child' path (or tagId) to target one tag."),
   tagId: z.union([z.string(), z.array(z.string())]).optional().describe("ID of tag(s) to filter tasks by (alternative to tagName). Can be a single ID or array of IDs"),
   tagMatchMode: z.enum(["any", "all"]).optional().describe("How to match multiple tags: 'any' returns tasks with at least one tag (default), 'all' returns tasks with every specified tag"),
   hideCompleted: z.boolean().optional().describe("Set to false to show completed tasks with this tag (default: true)"),

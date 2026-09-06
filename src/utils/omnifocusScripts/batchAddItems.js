@@ -18,7 +18,6 @@
     let projectsById = null;
     let tasksByName = null;
     let tasksById = null;
-    let tagsByName = null;
     let cachedFolders = null;
     let foldersById = null;
 
@@ -58,12 +57,21 @@
       return tasksByName;
     }
 
-    function getTagsByName() {
-      if (!tagsByName) {
-        tagsByName = new Map();
-        flattenedTags.forEach(t => tagsByName.set(t.name.toLowerCase(), t));
+    // Resolve tag references (ID / "Parent > Child" path / active name) for one
+    // item. Returns null after pushing a failure result if any reference is bad.
+    function resolveItemTags(tagNames, itemName, itemType) {
+      if (!tagNames || tagNames.length === 0) return { tags: [], warnings: [] };
+      const tagResolution = resolveTagRefs(tagNames, { createIfMissing: true });
+      if (tagResolution.errors.length > 0) {
+        results.push({
+          success: false,
+          type: itemType,
+          name: itemName,
+          error: tagResolution.errors.join('; ')
+        });
+        return null;
       }
-      return tagsByName;
+      return tagResolution;
     }
 
     function getAllFolders() {
@@ -103,6 +111,7 @@
         if (!itemName) {
           results.push({
             success: false,
+            type: itemType,
             error: "Item name is required"
           });
           continue;
@@ -141,6 +150,7 @@
             } else {
               results.push({
                 success: false,
+                type: itemType,
                 name: itemName,
                 error: `Parent item with tempId "${parentTempId}" not found in batch. Ensure the parent item is defined before the child.`
               });
@@ -153,6 +163,7 @@
             } else {
               results.push({
                 success: false,
+                type: itemType,
                 name: itemName,
                 error: `Parent task not found with ID: ${parentTaskId}`
               });
@@ -165,6 +176,7 @@
             } else {
               results.push({
                 success: false,
+                type: itemType,
                 name: itemName,
                 error: `Parent task not found: ${parentTaskName}`
               });
@@ -184,12 +196,17 @@
               const searchRef = projectId ? `ID "${projectId}"` : `name "${projectName}"`;
               results.push({
                 success: false,
+                type: itemType,
                 name: itemName,
                 error: `Project not found with ${searchRef}`
               });
               continue;
             }
           }
+
+          // Resolve tags before creating the task so a bad reference leaves nothing behind
+          const taskTags = resolveItemTags(tagNames, itemName, itemType);
+          if (!taskTags) continue;
 
           // Create the task
           let newTask;
@@ -210,13 +227,9 @@
           if (flagged) newTask.flagged = true;
           if (estimatedMinutes) newTask.estimatedMinutes = estimatedMinutes;
 
-          // Add tags (only load tags collection if needed)
-          if (tagNames && tagNames.length > 0) {
-            const tags = getTagsByName();
-            for (const tagName of tagNames) {
-              const tag = tags.get(tagName.toLowerCase());
-              if (tag) newTask.addTag(tag);
-            }
+          // Add tags
+          for (const tag of taskTags.tags) {
+            newTask.addTag(tag);
           }
 
           // Set repetition rule
@@ -258,8 +271,9 @@
           if (item.tempId) {
             taskResult.tempId = item.tempId;
           }
-          if (repetitionWarning) {
-            taskResult.warning = repetitionWarning;
+          const taskWarnings = taskTags.warnings.concat(repetitionWarning ? [repetitionWarning] : []);
+          if (taskWarnings.length > 0) {
+            taskResult.warnings = taskWarnings;
           }
           results.push(taskResult);
 
@@ -288,12 +302,17 @@
               const searchRef = folderId ? `ID "${folderId}"` : `name "${folderName}"`;
               results.push({
                 success: false,
+                type: itemType,
                 name: itemName,
                 error: `Folder not found with ${searchRef}`
               });
               continue;
             }
           }
+
+          // Resolve tags before creating the project so a bad reference leaves nothing behind
+          const projectTags = resolveItemTags(tagNames, itemName, itemType);
+          if (!projectTags) continue;
 
           // Create the project
           let newProject;
@@ -311,13 +330,9 @@
           if (estimatedMinutes) newProject.estimatedMinutes = estimatedMinutes;
           newProject.sequential = sequential;
 
-          // Add tags (only load tags collection if needed)
-          if (tagNames && tagNames.length > 0) {
-            const tags = getTagsByName();
-            for (const tagName of tagNames) {
-              const tag = tags.get(tagName.toLowerCase());
-              if (tag) newProject.addTag(tag);
-            }
+          // Add tags
+          for (const tag of projectTags.tags) {
+            newProject.addTag(tag);
           }
 
           // Store in tempIdMap for intra-batch references (tasks can reference project)
@@ -334,19 +349,26 @@
           if (item.tempId) {
             projectResult.tempId = item.tempId;
           }
+          if (projectTags.warnings.length > 0) {
+            projectResult.warnings = projectTags.warnings;
+          }
           results.push(projectResult);
 
         } else {
           results.push({
             success: false,
+            type: itemType,
             name: itemName,
             error: `Invalid item type: ${itemType}`
           });
         }
 
       } catch (itemError) {
+        // itemType is scoped to the try block, so re-derive it from the raw item
         results.push({
           success: false,
+          type: item.type || 'task',
+          name: item.name,
           error: `Error processing item: ${itemError}`
         });
       }

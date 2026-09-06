@@ -35,6 +35,7 @@
       matchMode: matchMode,
       exactMatch: exactMatch,
       matchedTagsBySearchTerm: {},
+      ambiguousSearchTerms: {},
       tasks: [],
       availableTags: []
     };
@@ -45,40 +46,49 @@
       : flattenedTags.filter(tag => tag.active);
     exportData.availableTags = allTags.map(tag => tag.name).sort();
 
-    // Build tag ID map for ID lookups
-    const tagsById = new Map();
-    allTags.forEach(tag => tagsById.set(tag.id.primaryKey, tag));
-
     console.log(`Searching for tags (${tagNames.length > 0 ? 'by name' : 'by ID'}): [${(tagNames.length > 0 ? tagNames : tagIds).join(', ')}] (exact: ${exactMatch}, mode: ${matchMode})`);
 
     // Find matching OmniFocus tags for each search term
     const matchingTagsBySearchTerm = new Map();
 
     if (tagIds.length > 0) {
-      // Search by ID - exact match only
+      // Search by ID - exact match, any status (an ID is explicit; includeDropped
+      // only governs name search)
       tagIds.forEach(searchId => {
-        const tag = tagsById.get(searchId);
+        let tag = null;
+        try { tag = Tag.byIdentifier(searchId); } catch (e) { tag = null; }
         const matches = tag ? [tag] : [];
         matchingTagsBySearchTerm.set(searchId, matches);
-        exportData.matchedTagsBySearchTerm[searchId] = matches.map(t => t.name);
-        console.log(`Search ID "${searchId}" matched ${matches.length} tags: ${matches.map(t => t.name).join(', ')}`);
+        exportData.matchedTagsBySearchTerm[searchId] = matches.map(getTagPath);
+        console.log(`Search ID "${searchId}" matched ${matches.length} tags: ${matches.map(getTagPath).join(', ')}`);
       });
     } else {
-      // Search by name
+      // Search by name; a "Parent > Child" term matches the full path exactly (#11)
       tagNames.forEach(searchTerm => {
+        const termLower = searchTerm.toLowerCase();
         let matches;
-        if (exactMatch) {
-          matches = allTags.filter(tag =>
-            tag.name.toLowerCase() === searchTerm.toLowerCase()
-          );
+        if (termLower.indexOf(' > ') !== -1) {
+          matches = allTags.filter(tag => getTagPath(tag).toLowerCase() === termLower);
+        } else if (exactMatch) {
+          matches = allTags.filter(tag => tag.name.toLowerCase() === termLower);
         } else {
-          matches = allTags.filter(tag =>
-            tag.name.toLowerCase().includes(searchTerm.toLowerCase())
-          );
+          matches = allTags.filter(tag => tag.name.toLowerCase().includes(termLower));
         }
         matchingTagsBySearchTerm.set(searchTerm, matches);
-        exportData.matchedTagsBySearchTerm[searchTerm] = matches.map(t => t.name);
-        console.log(`Search term "${searchTerm}" matched ${matches.length} tags: ${matches.map(t => t.name).join(', ')}`);
+        // Report full paths so same-named tags are distinguishable in the output
+        const matchedPaths = matches.map(getTagPath);
+        exportData.matchedTagsBySearchTerm[searchTerm] = matchedPaths;
+        // Same name on more than one matched tag = the term is ambiguous; tasks from
+        // every match are returned, but the caller needs to know the name is not unique
+        const nameCounts = new Map();
+        matches.forEach(t => nameCounts.set(t.name.toLowerCase(), (nameCounts.get(t.name.toLowerCase()) || 0) + 1));
+        const duplicateNames = Array.from(nameCounts.entries()).filter(([, n]) => n > 1);
+        if (duplicateNames.length > 0) {
+          exportData.ambiguousSearchTerms[searchTerm] = matches
+            .filter(t => nameCounts.get(t.name.toLowerCase()) > 1)
+            .map(getTagPath);
+        }
+        console.log(`Search term "${searchTerm}" matched ${matches.length} tags: ${matchedPaths.join(', ')}`);
       });
     }
 

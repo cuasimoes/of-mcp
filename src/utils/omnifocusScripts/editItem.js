@@ -2,30 +2,6 @@
 // This avoids AppleScript escaping issues with special characters like $
 // Note: parseLocalDate and buildRRule are provided by sharedUtils.js
 (() => {
-  // Helper function to find a tag by name (direct iteration to keep OmniJS proxy alive)
-  // If tag doesn't exist, creates it
-  function findOrCreateTag(tagName) {
-    const tagNameLower = tagName.toLowerCase();
-    for (const tag of flattenedTags) {
-      if (tag.name.toLowerCase() === tagNameLower) {
-        return tag;
-      }
-    }
-    // Tag doesn't exist - create it
-    return new Tag(tagName);
-  }
-
-  // Helper function to find a tag by name (for removal - don't create if missing)
-  function findTag(tagName) {
-    const tagNameLower = tagName.toLowerCase();
-    for (const tag of flattenedTags) {
-      if (tag.name.toLowerCase() === tagNameLower) {
-        return tag;
-      }
-    }
-    return null;
-  }
-
   try {
     const args = typeof injectedArgs !== 'undefined' ? injectedArgs : {};
 
@@ -57,9 +33,6 @@
       }
       tasksById.set(t.id.primaryKey, t);
     });
-
-    const tagsByName = new Map();
-    flattenedTags.forEach(t => tagsByName.set(t.name.toLowerCase(), t));
 
     const allFolders = flattenedFolders;
 
@@ -94,6 +67,37 @@
     const changedProperties = [];
     const originalName = foundItem.name;
     const originalId = foundItem.id.primaryKey;
+
+    // Resolve tag references (ID / "Parent > Child" path / active name) up front so
+    // an unresolvable reference fails the edit before any property is changed.
+    // Only the fields the apply step will use are resolved: replaceTags wins over
+    // addTags/removeTags, so nothing gets created for a field that is then ignored.
+    const resolvedTagOps = {};
+    let tagWarnings = [];
+    const createField = (args.replaceTags && args.replaceTags.length > 0) ? 'replaceTags'
+      : (args.addTags && args.addTags.length > 0) ? 'addTags' : null;
+    if (createField) {
+      const tagResolution = resolveTagRefs(args[createField], { createIfMissing: true });
+      if (tagResolution.errors.length > 0) {
+        return JSON.stringify({
+          success: false,
+          error: tagResolution.errors.join('; ')
+        });
+      }
+      resolvedTagOps[createField] = tagResolution.tags;
+      tagWarnings = tagWarnings.concat(tagResolution.warnings);
+    }
+    if (createField !== 'replaceTags' && args.removeTags && args.removeTags.length > 0) {
+      const removal = resolveTagRefsOnItem(args.removeTags, foundItem);
+      if (removal.errors.length > 0) {
+        return JSON.stringify({
+          success: false,
+          error: removal.errors.join('; ')
+        });
+      }
+      resolvedTagOps.removeTags = removal.tags;
+      tagWarnings = tagWarnings.concat(removal.warnings);
+    }
 
     // Apply changes
 
@@ -225,35 +229,30 @@
     }
 
     // Replace all tags (tasks and projects both support tags)
-    if (args.replaceTags && args.replaceTags.length > 0) {
+    if (resolvedTagOps.replaceTags) {
       // First, remove all existing tags
       const existingTags = foundItem.tags.slice(); // Make a copy
       for (const existingTag of existingTags) {
         foundItem.removeTag(existingTag);
       }
-      // Then add new tags (creates if missing)
-      for (const tagName of args.replaceTags) {
-        const tag = findOrCreateTag(tagName);
+      // Then add new tags (missing names were created during resolution)
+      for (const tag of resolvedTagOps.replaceTags) {
         foundItem.addTag(tag);
       }
       changedProperties.push("tags (replaced)");
     } else {
       // Add tags (tasks and projects both support tags)
-      if (args.addTags && args.addTags.length > 0) {
-        for (const tagName of args.addTags) {
-          const tag = findOrCreateTag(tagName);
+      if (resolvedTagOps.addTags) {
+        for (const tag of resolvedTagOps.addTags) {
           foundItem.addTag(tag);
         }
         changedProperties.push("tags (added)");
       }
 
-      // Remove tags (tasks and projects both support tags)
-      if (args.removeTags && args.removeTags.length > 0) {
-        for (const tagName of args.removeTags) {
-          const tag = findTag(tagName);
-          if (tag) {
-            foundItem.removeTag(tag);
-          }
+      // Remove tags (tasks and projects both support tags); a miss is a warning, not a change
+      if (resolvedTagOps.removeTags && resolvedTagOps.removeTags.length > 0) {
+        for (const tag of resolvedTagOps.removeTags) {
+          foundItem.removeTag(tag);
         }
         changedProperties.push("tags (removed)");
       }
@@ -457,12 +456,16 @@
       }
     }
 
-    return JSON.stringify({
+    const result = {
       success: true,
       id: originalId,
       name: originalName,
       changedProperties: changedProperties.join(", ")
-    });
+    };
+    if (tagWarnings.length > 0) {
+      result.warnings = tagWarnings;
+    }
+    return JSON.stringify(result);
 
   } catch (error) {
     return JSON.stringify({

@@ -62,6 +62,7 @@ export async function editItem(params: EditItemParams): Promise<{
   id?: string,
   name?: string,
   changedProperties?: string,
+  warnings?: string[],
   error?: string
 }> {
   try {
@@ -130,7 +131,8 @@ export async function editItem(params: EditItemParams): Promise<{
         success: true,
         id: parsed.id,
         name: parsed.name,
-        changedProperties: parsed.changedProperties
+        changedProperties: parsed.changedProperties,
+        warnings: parsed.warnings
       };
     } else {
       return {

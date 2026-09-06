@@ -100,6 +100,7 @@ type ItemResult = {
   type?: string;
   id?: string;
   name?: string;
+  warnings?: string[];
   container?: TaskContainer; // Tasks only: where the script actually placed the task
   error?: string;
 };
