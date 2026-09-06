@@ -5,11 +5,22 @@ on:
     branches: [main]
   pull_request:
 
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   check:
     # macOS, not ubuntu: package.json declares "os": ["darwin"], so `npm ci`
     # fails on linux with EBADPLATFORM. Free on public repos.
     runs-on: macos-latest
+
+    # The failure mode this job exists to catch is a tsc hang/OOM. Without a
+    # cap, a regression burns the 360-minute default instead of failing fast.
+    timeout-minutes: 10
 
     steps:
       - uses: actions/checkout@v5
@@ -33,3 +44,13 @@ jobs:
 
       - name: Build
         run: npm run build:fast
+
+      # The unbundled emit path the tests/test-*.mjs harnesses import from.
+      # Not exercised by `build`, so it would otherwise rot unnoticed.
+      - name: Build (unbundled tsc emit)
+        run: npm run build:tsc
+
+      # Guards the thing that was actually broken. This runs prepublishOnly for
+      # real and packs a tarball; it makes no registry call.
+      - name: Publish dry run
+        run: npm publish --dry-run
