@@ -9,7 +9,7 @@ const log = logger.child('def:editItem');
 
 export const schema = z.object({
   id: z.string().optional().describe("The ID of the task or project to edit"),
-  name: z.string().optional().describe("The name of the task or project to edit (as fallback if ID not provided)"),
+  name: z.string().optional().describe("The name of the task or project to edit (as fallback if ID not provided). This selects the item; it does NOT rename it — use newName for that."),
   itemType: z.enum(['task', 'project']).describe("Type of item to edit ('task' or 'project')"),
   
   // Common editable fields
@@ -55,6 +55,11 @@ export const schema = z.object({
   newNextReviewDate: z.string().optional().describe("Set next review date directly (ISO format YYYY-MM-DD). Only applies to projects.")
 });
 
+// Fields that select the item or qualify another mutation rather than change anything
+// themselves. Every other schema key is a mutation, so new fields are picked up automatically.
+const NON_MUTATION_FIELDS = new Set(['id', 'name', 'itemType', 'dropCompletely']);
+const MUTATION_FIELDS = Object.keys(schema.shape).filter(key => !NON_MUTATION_FIELDS.has(key));
+
 export async function handler(args: z.infer<typeof schema>, _extra: RequestHandlerExtra<ServerRequest, ServerNotification>) {
   try {
     // Validate that either id or name is provided
@@ -67,23 +72,36 @@ export async function handler(args: z.infer<typeof schema>, _extra: RequestHandl
         isError: true
       };
     }
-    
+
+    // A call with only selector fields would round-trip to OmniFocus and report success
+    // having written nothing (#14). Refuse it before the script runs.
+    const hasMutation = MUTATION_FIELDS.some(key => (args as Record<string, unknown>)[key] !== undefined);
+    if (!hasMutation) {
+      return {
+        content: [{
+          type: "text" as const,
+          text: "No changes specified — `name`/`id` select the item to edit; use `newName`, `newStatus`, `newNote`, `newDueDate`, etc. to change it."
+        }],
+        isError: true
+      };
+    }
+
     // Call the editItem function 
     const result = await editItem(args as EditItemParams);
     
     if (result.success) {
       // Item was edited successfully
       const itemTypeLabel = args.itemType === 'task' ? 'Task' : 'Project';
-      let changedText = '';
-      
-      if (result.changedProperties) {
-        changedText = ` (${result.changedProperties})`;
-      }
-      
+      // Empty changedProperties means the script accepted the call but applied nothing
+      // (e.g. a project-only field sent for a task). Say so instead of implying a write.
+      const text = result.changedProperties
+        ? `✅ ${itemTypeLabel} "${result.name}" updated successfully (${result.changedProperties}).`
+        : `⚠️ ${itemTypeLabel} "${result.name}" (no changes) — the supplied fields did not apply to this ${args.itemType}.`;
+
       return {
         content: [{
           type: "text" as const,
-          text: `✅ ${itemTypeLabel} "${result.name}" updated successfully${changedText}.`
+          text
         }]
       };
     } else {

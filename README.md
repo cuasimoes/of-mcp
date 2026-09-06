@@ -317,6 +317,10 @@ add_omnifocus_task {
   }
 }
 
+# NOTE: `id`/`name` only SELECT the item; mutations are the new*-prefixed fields
+# (newName, newStatus, newNote, ...). A call with no mutation field is rejected
+# as an error rather than reported as a successful edit.
+
 # Edit task to add/remove repetition
 edit_item {
   "id": "taskId123",
