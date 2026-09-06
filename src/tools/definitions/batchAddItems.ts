@@ -63,7 +63,15 @@ export async function handler(args: z.infer<typeof schema>, _extra: RequestHandl
             });
             idText = ' (Note: ID not available)';
           }
-          return `- ✅ ${item.type}: "${item.name}"${idText}`;
+          let locationText = '';
+          if (item.container?.type === 'project' && item.container.name) {
+            locationText = ` in project "${item.container.name}"`;
+          } else if (item.container?.type === 'parentTask' && item.container.name) {
+            locationText = ` as a subtask of "${item.container.name}" (id ${item.container.id})`;
+          } else if (item.container?.type === 'inbox') {
+            locationText = ' in your inbox';
+          }
+          return `- ✅ ${item.type}: "${item.name}"${idText}${locationText}`;
         } else {
           return `- ❌ ${item.type || 'item'}: "${item.name || 'unknown'}" - Error: ${item.error}`;
         }
