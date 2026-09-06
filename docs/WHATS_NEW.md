@@ -1,6 +1,60 @@
-# OmniFocus MCP Server - What's New (v1.33.0)
+# OmniFocus MCP Server - What's New (v1.34.0)
 
 > Summary of changes from Sprints 1-10 for AI assistants using this MCP server.
+
+## v1.34.0 Tag resolution, honest write confirmations, and perspective rules (#5, #6, #7, #9, #10, #11, #12, #13, #14)
+
+A backlog sweep of seven fixes. The theme is **write confirmations that describe what actually happened** — several tools reported success for writes that never occurred, which is invisible unless you independently re-read the item.
+
+### Tag references now accept IDs and paths, and never resolve to dropped tags (#5, #7, #11)
+
+`tags`, `addTags`, `removeTags`, and `replaceTags` (on `add_omnifocus_task`, `add_project`, `batch_add_items`, `edit_item`, `batch_edit_items`) resolve each reference in this order:
+
+1. **Tag ID** — exact match, any status
+2. **`"Parent > Child"` path** — walked from the top level, effectively-active tags only
+3. **Plain name** — effectively-active tags only, case-insensitive
+
+Previously an ID or a path was taken as a *literal tag name*, so `addTags: ["Action > Training"]` created a tag actually named `Action > Training`. An unresolvable ID or path is now an error instead.
+
+**Dropped tags are no longer reused.** Matching uses `effectiveActive`, so a tag whose *parent* is dropped no longer matches by name — the case that caused tasks to silently land on a retired `Akamai > Training`. When a name collides with a dropped tag, a new active tag is created and the collision is reported as a warning.
+
+**Ambiguity is now reported.** When a plain name matches more than one tag, all candidates are listed by full path and the chosen one is named; `get_tasks_by_tag` returns tasks from every matching tag and says the name was ambiguous. Pass a path or an ID to target one specifically.
+
+**`removeTags` resolves against the item's own tags** (any status), so a dropped tag already attached to a task can be removed by name. A reference matching nothing on the item is reported as a warning rather than counted as a change.
+
+Every auto-created tag is now reported with a `Created new tag "X"` warning — a typo in a 20-item batch used to spawn 20 tags silently.
+
+### `edit_item` no longer reports success when it changed nothing (#14)
+
+`name` is a *lookup key*, not a rename — the mutation fields are `new`-prefixed (`newName`, `newStatus`, `newNote`, `newDueDate`). A call supplying only selectors now returns an error naming the right fields, instead of `✅ … updated successfully` with the old name echoed back. A call whose fields produced no change also returns an error rather than bare success.
+
+### `add_omnifocus_task` reports the container it actually used (#10)
+
+The response is now built from the resolved container returned by the write, not re-derived from the inputs — so a task placed via `projectId` says `in project "X"` instead of `in your inbox`. `batch_add_items` lines gained the same location suffix, and subtask text names the resolved parent plus its ID (`parentTaskName` matches first-match-wins across the database).
+
+### `newSequential` now works on action groups (#9)
+
+`edit_item` and `batch_edit_items` gated the write on the item being a project, so tasks fell through with no write and no error. Action groups are exactly where child ordering matters. `sequential` now appears in the changed-fields list for tasks.
+
+### `edit_tag` can reparent again (#6)
+
+The reparent path called `tag.moveTo()`, which does not exist on `Tag` — every attempt threw `TypeError`. It now uses OmniJS `moveTags()`. Re-sending the current parent is a no-op rather than silently re-appending the tag at the end of its siblings.
+
+### `list_tags` renders the full hierarchy (#12)
+
+Rendering stopped at depth 2 while the summary counted every tag, so deeper branches were invisible and the count disagreed with the tree. Rendering is now recursive and keyed by parent **ID** rather than name (same-named parents previously had their children merged or duplicated). A tag whose parent isn't in the result set is marked `(parent not shown)`, and a count mismatch is stated explicitly.
+
+### `list_custom_perspectives` can return filter rules (#13)
+
+New `format: 'rules'` returns each perspective's `archivedFilterRules` and top-level aggregation, rendered readably — nested groups, disabled rules marked, leaves as key/value. `simple` and `detailed` output is unchanged.
+
+Three states are distinguished, and a perspective whose rules cannot be read is **never** reported as having a default rule set: rules listed, `Rules: none`, or `Rules: ⚠️ could not be read: <msg>`. Older perspectives can throw from the getter itself; those are surfaced as unreadable rather than hidden.
+
+### Testing
+
+Each fix ships a live OmniFocus harness in `tests/test-issue-<N>.mjs`, run against the unfixed code to reproduce the bug and again after to confirm. These require a running OmniFocus and are not part of `npm test`; each file's header carries its exact build-and-run command.
+
+---
 
 ## v1.33.0 Build-staleness gate: `get_server_version` reports build provenance (#126)
 
