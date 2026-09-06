@@ -16,6 +16,7 @@ interface TagInfo {
   taskCount?: number;
   availableTaskCount?: number;
   parent: string | null;
+  parentId: string | null;
 }
 
 interface ListTagsResult {
@@ -54,16 +55,19 @@ export async function listTags(options: ListTagsOptions = {}): Promise<string> {
       return output;
     }
 
-    // Group by parent for hierarchical display
+    // Group by parent ID (names are not unique) for hierarchical display.
+    // A tag whose parent was filtered out (e.g. dropped parent, includeDropped=false)
+    // is promoted to top level so every returned tag is rendered.
+    const knownIds = new Set(parsed.tags.map(t => t.id));
     const topLevel: TagInfo[] = [];
     const byParent = new Map<string, TagInfo[]>();
 
     for (const tag of parsed.tags) {
-      if (tag.parent) {
-        if (!byParent.has(tag.parent)) {
-          byParent.set(tag.parent, []);
+      if (tag.parentId && knownIds.has(tag.parentId)) {
+        if (!byParent.has(tag.parentId)) {
+          byParent.set(tag.parentId, []);
         }
-        byParent.get(tag.parent)!.push(tag);
+        byParent.get(tag.parentId)!.push(tag);
       } else {
         topLevel.push(tag);
       }
@@ -78,24 +82,23 @@ export async function listTags(options: ListTagsOptions = {}): Promise<string> {
       }
     };
 
-    for (const tag of topLevel) {
+    const renderTag = (tag: TagInfo, depth: number) => {
       const status = getStatusDisplay(tag.status);
       const tasks = (showTaskCounts && tag.availableTaskCount && tag.availableTaskCount > 0)
         ? ` [${tag.availableTaskCount} available]`
         : '';
-      output += `• **${tag.name}**${status}${tasks} [ID: ${tag.id}]\n`;
-
-      // Show children if any
-      const children = byParent.get(tag.name);
-      if (children) {
-        for (const child of children) {
-          const childStatus = getStatusDisplay(child.status);
-          const childTasks = (showTaskCounts && child.availableTaskCount && child.availableTaskCount > 0)
-            ? ` [${child.availableTaskCount} available]`
-            : '';
-          output += `  └─ ${child.name}${childStatus}${childTasks} [ID: ${child.id}]\n`;
-        }
+      if (depth === 0) {
+        output += `• **${tag.name}**${status}${tasks} [ID: ${tag.id}]\n`;
+      } else {
+        output += `${'  '.repeat(depth)}└─ ${tag.name}${status}${tasks} [ID: ${tag.id}]\n`;
       }
+      for (const child of byParent.get(tag.id) ?? []) {
+        renderTag(child, depth + 1);
+      }
+    };
+
+    for (const tag of topLevel) {
+      renderTag(tag, 0);
     }
 
     output += `\n📊 **Summary**: ${parsed.count} tags\n`;
