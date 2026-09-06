@@ -1,6 +1,70 @@
 # TypeScript Compiler OOM Troubleshooting
 
-If `tsc` crashes with an out-of-memory error or hangs indefinitely when building this project, try these solutions in order.
+> **RESOLVED (issue #26).** The OOM had a single root cause — `"moduleResolution": "node"`
+> in `tsconfig.json` — and it is fixed. `npm run typecheck` now completes in under a
+> second. See [Root Cause](#root-cause-resolved) below.
+>
+> If you are hitting an OOM again, first check that `tsconfig.json` still sets
+> `"module": "NodeNext"` and `"moduleResolution": "NodeNext"`. Reverting either one
+> reproduces the crash immediately. CI (`.github/workflows/ci.yml`) runs
+> `npm run typecheck` on every PR, so a regression should not reach `main` silently.
+>
+> The rest of this document is kept for the diagnostic techniques, which are useful
+> for any future compiler performance problem.
+
+## Root Cause (resolved)
+
+`tsconfig.json` used `"moduleResolution": "node"` — the legacy node10 algorithm, which
+**ignores `package.json` `exports` maps**. That split zod into two declaration trees:
+
+| import | resolved via | declaration tree |
+| --- | --- | --- |
+| our `import { z } from 'zod'` | zod's `types: "./index.d.cts"` field | `.d.cts` |
+| the SDK's `import type * as z3 from 'zod/v3'` | directory walk to `zod/v3/index.d.ts` | `.d.ts` |
+
+TypeScript therefore held two structurally identical but **distinct** copies of every
+zod class. The MCP SDK's
+
+```ts
+type SchemaOutput<S> = S extends z3.ZodTypeAny ? z3.infer<S>
+                     : S extends z4.$ZodType  ? z4.output<S> : never;
+```
+
+then had to compare the two deep recursive trees structurally for every key of every
+tool schema — inside a four-way overload resolution on `McpServer.tool()`. That is
+quadratic in schema size and repeated per registration.
+
+Measured on `src/`:
+
+| moduleResolution | wall | instantiations | result |
+| --- | --- | --- | --- |
+| `node` (old) | 56s | 10.4M **per `server.tool()` call** | OOM crash |
+| `node16` | 0.8s | 111,430 | clean |
+| **`nodenext`** (current) | **0.8s** | **111,430** | **clean** |
+| `bundler` | 0.8s | 110,480 | clean |
+
+It was never only a performance problem. Before the fix, `tsc` also emitted real
+errors — `TS2589: Type instantiation is excessively deep and possibly infinite`,
+followed by `TS2769: No overload matches this call` on every registration — because
+overload resolution blew past the instantiation depth limit and then gave up.
+
+Two things that made this hard to see, and are worth remembering:
+
+- **Typechecking a single file resolved in about a second**, which pointed at
+  whole-program resolution and away from any one file's types. That was right, but
+  the cause was the *resolution mode*, not program size.
+- The obvious suspects are all innocent here: `skipLibCheck` was already on, only
+  `@types/node` is installed so there was no `types` scope to narrow, and the crash
+  reproduced across TypeScript versions and heap sizes.
+
+A related trap: `@modelcontextprotocol/sdk` requires `zod@^3.25 || ^4.0`, and zod
+3.24 and earlier ship **no `./v3` subpath at all**. `package.json` must not declare a
+zod floor below 3.25, or `zod/v3` fails to resolve outright.
+
+## Legacy troubleshooting notes
+
+The steps below were written while the cause was still unknown. They did not fix it —
+`--extendedDiagnostics` and a bisect of `server.ts` did. Keep them for the commands.
 
 ## If tsc Hangs Completely (Even Diagnostics)
 
@@ -146,8 +210,13 @@ npx tsc --version  # Verify it's 5.6.3
 npm run build
 ```
 
-## Why This Happens
+## Why This Happened
 
-The `@modelcontextprotocol/sdk` and `zod` dependencies have complex TypeScript generic types. During type checking, TypeScript must resolve these types, which can consume significant memory. The codebase itself is small (~8K lines), but the type inference for these libraries is intensive.
+**Superseded — see [Root Cause](#root-cause-resolved) at the top.**
 
-TypeScript 5.8.x introduced changes to type inference that can exacerbate this issue on some systems.
+This section previously blamed the intrinsic complexity of the
+`@modelcontextprotocol/sdk` and `zod` generic types, and suggested TypeScript 5.8's
+inference changes made it worse. Both were wrong, and both sent several
+investigations down dead ends. The SDK and zod types are fine; a duplicated zod
+declaration tree, caused by legacy module resolution, is what made comparing them
+unbounded. The crash reproduced on every TypeScript version tried.
