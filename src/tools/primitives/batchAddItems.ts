@@ -1,5 +1,5 @@
 import { executeOmniFocusScript } from '../../utils/scriptExecution.js';
-import { RepetitionRule } from './addOmniFocusTask.js';
+import { RepetitionRule, TaskContainer } from './addOmniFocusTask.js';
 import { createValidationError, isStructuredError } from '../../utils/errors.js';
 import { logger } from '../../utils/logger.js';
 import { queryCache } from '../../utils/cache.js';
@@ -101,6 +101,7 @@ type ItemResult = {
   id?: string;
   name?: string;
   warnings?: string[];
+  container?: TaskContainer; // Tasks only: where the script actually placed the task
   error?: string;
 };
 

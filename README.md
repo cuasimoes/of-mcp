@@ -354,6 +354,10 @@ Access your OmniFocus custom perspectives with hierarchical task display:
 # List all your custom perspectives
 list_custom_perspectives {"format": "detailed"}
 
+# Inspect each perspective's filter rules and top-level aggregation
+# (a perspective whose rules cannot be read is reported as such, never as a default)
+list_custom_perspectives {"format": "rules"}
+
 # Get tasks from custom perspective by name
 get_custom_perspective_tasks {
   "perspectiveName": "Today's Work",  # Your custom perspective name
@@ -571,7 +575,7 @@ get_project_by_id {
 2. **add_project** - Create projects
 3. **add_folder** - Create folders (with nesting support)
 4. **remove_item** - Delete tasks or projects
-5. **edit_item** - Edit tasks or projects
+5. **edit_item** - Edit tasks or projects. `id`/`name` only *select* the item; mutations are the `new*`-prefixed fields (`newName`, `newStatus`, `newNote`, ...). A call with no mutation field, or one that produces no change, returns an error rather than a successful edit.
 6. **batch_add_items** - Bulk add tasks/projects (true batching - 9x faster)
 7. **batch_edit_items** - Bulk edit tasks/projects (true batching - 12x faster)
 8. **batch_remove_items** - Bulk remove (true batching - 9x faster)
@@ -588,7 +592,7 @@ get_project_by_id {
 17. **batch_filter_tasks** - Filter multiple projects in one call (faster than multiple filter_tasks)
 
 ### 🌟 Custom Perspective Tools
-18. **list_custom_perspectives** - List all custom perspectives with details
+18. **list_custom_perspectives** - List all custom perspectives with details (`format: "rules"` shows each perspective's filter rules)
 19. **get_custom_perspective_tasks** - Access custom perspective with hierarchical display
 
 ### 📊 Analytics & Tracking

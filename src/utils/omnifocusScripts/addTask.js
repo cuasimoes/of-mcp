@@ -190,11 +190,19 @@
       }
     }
 
+    // Report the container that was actually resolved so callers don't re-derive it from inputs
+    const containerInfo = { type: containerType };
+    if (container) {
+      containerInfo.id = container.id.primaryKey;
+      containerInfo.name = container.name;
+    }
+
     const result = {
       success: true,
       taskId: newTask.id.primaryKey,
       name: newTask.name,
-      isRepeating: newTask.repetitionRule !== null
+      isRepeating: newTask.repetitionRule !== null,
+      container: containerInfo
     };
     const warnings = tagWarnings.concat(repetitionWarning ? [repetitionWarning] : []);
     if (warnings.length > 0) {

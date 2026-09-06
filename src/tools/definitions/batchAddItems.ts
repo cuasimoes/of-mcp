@@ -63,10 +63,18 @@ export async function handler(args: z.infer<typeof schema>, _extra: RequestHandl
             });
             idText = ' (Note: ID not available)';
           }
+          let locationText = '';
+          if (item.container?.type === 'project' && item.container.name) {
+            locationText = ` in project "${item.container.name}"`;
+          } else if (item.container?.type === 'parentTask' && item.container.name) {
+            locationText = ` as a subtask of "${item.container.name}" (id ${item.container.id})`;
+          } else if (item.container?.type === 'inbox') {
+            locationText = ' in your inbox';
+          }
           const warningText = item.warnings && item.warnings.length > 0
             ? ` ⚠️ ${item.warnings.join(' ')}`
             : '';
-          return `- ✅ ${item.type}: "${item.name}"${idText}${warningText}`;
+          return `- ✅ ${item.type}: "${item.name}"${idText}${locationText}${warningText}`;
         } else {
           return `- ❌ ${item.type || 'item'}: "${item.name || 'unknown'}" - Error: ${item.error}`;
         }

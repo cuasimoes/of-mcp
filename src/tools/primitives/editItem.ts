@@ -42,7 +42,7 @@ export interface EditItemParams {
   moveToInbox?: boolean;        // Move task to inbox
 
   // Project-specific fields
-  newSequential?: boolean;      // Whether the project should be sequential
+  newSequential?: boolean;      // Whether the project or action group should be sequential
   newFolderName?: string;       // New folder to move the project to (by name)
   newFolderId?: string;         // New folder to move the project to (by ID)
   newProjectStatus?: ProjectStatus; // New status for projects

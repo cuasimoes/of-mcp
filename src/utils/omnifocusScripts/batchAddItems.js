@@ -111,6 +111,7 @@
         if (!itemName) {
           results.push({
             success: false,
+            type: itemType,
             error: "Item name is required"
           });
           continue;
@@ -149,6 +150,7 @@
             } else {
               results.push({
                 success: false,
+                type: itemType,
                 name: itemName,
                 error: `Parent item with tempId "${parentTempId}" not found in batch. Ensure the parent item is defined before the child.`
               });
@@ -161,6 +163,7 @@
             } else {
               results.push({
                 success: false,
+                type: itemType,
                 name: itemName,
                 error: `Parent task not found with ID: ${parentTaskId}`
               });
@@ -173,6 +176,7 @@
             } else {
               results.push({
                 success: false,
+                type: itemType,
                 name: itemName,
                 error: `Parent task not found: ${parentTaskName}`
               });
@@ -192,6 +196,7 @@
               const searchRef = projectId ? `ID "${projectId}"` : `name "${projectName}"`;
               results.push({
                 success: false,
+                type: itemType,
                 name: itemName,
                 error: `Project not found with ${searchRef}`
               });
@@ -249,11 +254,19 @@
             tempIdMap.set(item.tempId, newTask);
           }
 
+          // Report the container that was actually resolved so callers don't re-derive it from inputs
+          const containerInfo = { type: containerType };
+          if (container) {
+            containerInfo.id = container.id.primaryKey;
+            containerInfo.name = container.name;
+          }
+
           const taskResult = {
             success: true,
             type: 'task',
             id: newTask.id.primaryKey,
-            name: newTask.name
+            name: newTask.name,
+            container: containerInfo
           };
           if (item.tempId) {
             taskResult.tempId = item.tempId;
@@ -289,6 +302,7 @@
               const searchRef = folderId ? `ID "${folderId}"` : `name "${folderName}"`;
               results.push({
                 success: false,
+                type: itemType,
                 name: itemName,
                 error: `Folder not found with ${searchRef}`
               });
@@ -343,14 +357,18 @@
         } else {
           results.push({
             success: false,
+            type: itemType,
             name: itemName,
             error: `Invalid item type: ${itemType}`
           });
         }
 
       } catch (itemError) {
+        // itemType is scoped to the try block, so re-derive it from the raw item
         results.push({
           success: false,
+          type: item.type || 'task',
+          name: item.name,
           error: `Error processing item: ${itemError}`
         });
       }

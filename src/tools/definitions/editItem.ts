@@ -9,7 +9,7 @@ const log = logger.child('def:editItem');
 
 export const schema = z.object({
   id: z.string().optional().describe("The ID of the task or project to edit"),
-  name: z.string().optional().describe("The name of the task or project to edit (as fallback if ID not provided)"),
+  name: z.string().optional().describe("The name of the task or project to edit (as fallback if ID not provided). This selects the item; it does NOT rename it — use newName for that."),
   itemType: z.enum(['task', 'project']).describe("Type of item to edit ('task' or 'project')"),
   
   // Common editable fields
@@ -23,7 +23,7 @@ export const schema = z.object({
   
   // Tag operations (work on both tasks and projects)
   addTags: z.array(z.string()).optional().describe("Tags to add (works on both tasks and projects). Each entry may be a tag ID, a 'Parent > Child' path, or a plain name. Names match active tags only (never dropped ones) and are created if missing; an ID or path that does not resolve is an error."),
-  removeTags: z.array(z.string()).optional().describe("Tags to remove (works on both tasks and projects). Accepts tag IDs, 'Parent > Child' paths, or plain names (active tags only)."),
+  removeTags: z.array(z.string()).optional().describe("Tags to remove (works on both tasks and projects). Resolved against the item's OWN tags — tag ID, 'Parent > Child' path, or plain name, any status, so a dropped tag can be removed by name. A reference that is not on the item is reported as a warning and removes nothing."),
   replaceTags: z.array(z.string()).optional().describe("Replace all existing tags (works on both tasks and projects). Same reference rules as addTags: tag ID, 'Parent > Child' path, or plain name."),
 
   // Task-specific fields
@@ -39,7 +39,7 @@ export const schema = z.object({
   moveToInbox: z.boolean().optional().describe("Set to true to move task to inbox"),
 
   // Project-specific fields
-  newSequential: z.boolean().optional().describe("Whether the project should be sequential"),
+  newSequential: z.boolean().optional().describe("Whether the project or action group should be sequential"),
   newFolderName: z.string().optional().describe("New folder to move the project to (by folder name)"),
   newFolderId: z.string().optional().describe("New folder to move the project to (by folder ID)"),
   newProjectStatus: z.enum(['active', 'completed', 'dropped', 'onHold']).optional().describe("New status for projects"),
@@ -55,6 +55,12 @@ export const schema = z.object({
   newNextReviewDate: z.string().optional().describe("Set next review date directly (ISO format YYYY-MM-DD). Only applies to projects.")
 });
 
+// Fields that select the item or qualify another mutation rather than change anything
+// themselves. Every other schema key is a mutation, so new fields are picked up automatically.
+type SchemaKey = keyof typeof schema.shape;
+const NON_MUTATION_FIELDS: ReadonlySet<SchemaKey> = new Set<SchemaKey>(['id', 'name', 'itemType', 'dropCompletely']);
+const MUTATION_FIELDS = (Object.keys(schema.shape) as SchemaKey[]).filter(key => !NON_MUTATION_FIELDS.has(key));
+
 export async function handler(args: z.infer<typeof schema>, _extra: RequestHandlerExtra<ServerRequest, ServerNotification>) {
   try {
     // Validate that either id or name is provided
@@ -67,27 +73,48 @@ export async function handler(args: z.infer<typeof schema>, _extra: RequestHandl
         isError: true
       };
     }
-    
+
+    // A call with only selector fields would round-trip to OmniFocus and report success
+    // having written nothing (#14). Refuse it before the script runs.
+    const hasMutation = MUTATION_FIELDS.some(key => args[key] !== undefined);
+    if (!hasMutation) {
+      return {
+        content: [{
+          type: "text" as const,
+          text: "No changes specified — `name`/`id` select the item to edit; use `newName`, `newStatus`, `newNote`, `newDueDate`, etc. to change it."
+        }],
+        isError: true
+      };
+    }
+
     // Call the editItem function 
     const result = await editItem(args as EditItemParams);
     
     if (result.success) {
       // Item was edited successfully
       const itemTypeLabel = args.itemType === 'task' ? 'Task' : 'Project';
-      let changedText = '';
-      
-      if (result.changedProperties) {
-        changedText = ` (${result.changedProperties})`;
-      }
-
+      // Empty changedProperties means the script accepted the call but applied nothing
+      // (e.g. a project-only field sent for a task). That is an error, not a write.
+      // Warnings explain WHY nothing changed (e.g. a removeTags reference that is
+      // not on the item), so they belong on the no-change path too.
       const warningText = result.warnings && result.warnings.length > 0
         ? '\n' + result.warnings.map(w => `⚠️ ${w}`).join('\n')
         : '';
 
+      if (!result.changedProperties) {
+        return {
+          content: [{
+            type: "text" as const,
+            text: `⚠️ ${itemTypeLabel} "${result.name}" — no change was made: the supplied fields produced no change on this ${args.itemType}.${warningText}`
+          }],
+          isError: true
+        };
+      }
+
       return {
         content: [{
           type: "text" as const,
-          text: `✅ ${itemTypeLabel} "${result.name}" updated successfully${changedText}.${warningText}`
+          text: `✅ ${itemTypeLabel} "${result.name}" updated successfully (${result.changedProperties}).${warningText}`
         }]
       };
     } else {

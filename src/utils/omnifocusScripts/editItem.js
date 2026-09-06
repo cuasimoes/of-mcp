@@ -285,8 +285,8 @@
       }
     }
 
-    // Project-specific: Sequential
-    if (itemType === 'project' && args.newSequential !== undefined) {
+    // Sequential (projects and action groups both expose it; issue #9)
+    if (args.newSequential !== undefined) {
       foundItem.sequential = args.newSequential;
       changedProperties.push("sequential");
     }

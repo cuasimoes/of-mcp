@@ -18,7 +18,7 @@ export const schema = z.object({
   estimatedMinutes: z.number().optional().describe("Estimated time to complete the task, in minutes"),
   tags: z.array(z.string()).optional().describe("Tags to assign to the task. Each entry may be a tag ID, a 'Parent > Child' path, or a plain name. Names match active tags only (never dropped ones) and are created if missing; an ID or path that does not resolve is an error."),
   projectName: z.string().optional().describe("The name of the project to add the task to (will add to inbox if not specified)"),
-  projectId: z.string().optional().describe("The ID of the project to add the task to (alternative to projectName)"),
+  projectId: z.string().optional().describe("The ID of the project to add the task to (alternative to projectName). The response names the project the task was actually placed in."),
   parentTaskId: z.string().optional().describe("The ID of the parent task to create this task as a subtask"),
   parentTaskName: z.string().optional().describe("The name of the parent task to create this task as a subtask (alternative to parentTaskId)"),
   repetitionRule: repetitionRuleSchema.optional().describe("Repetition rule for recurring tasks. Examples: {frequency: 'daily'}, {frequency: 'weekly', daysOfWeek: [1,3,5]}, {frequency: 'monthly', dayOfMonth: 15}")
@@ -31,12 +31,22 @@ export async function handler(args: z.infer<typeof schema>, _extra: RequestHandl
     
     if (result.success) {
       // Task was added successfully
+      // Prefer the container the script actually resolved; only derive from inputs if it's absent
       let locationText;
-      if (args.parentTaskId || args.parentTaskName) {
+      const container = result.container;
+      if (container?.type === 'project' && container.name) {
+        locationText = `in project "${container.name}"`;
+      } else if (container?.type === 'parentTask' && container.name) {
+        locationText = `as a subtask of "${container.name}" (id ${container.id})`;
+      } else if (container?.type === 'inbox') {
+        locationText = "in your inbox";
+      } else if (args.parentTaskId || args.parentTaskName) {
         const parentRef = args.parentTaskId || args.parentTaskName;
         locationText = `as a subtask of "${parentRef}"`;
-      } else if (args.projectName) {
-        locationText = `in project "${args.projectName}"`;
+      } else if (args.projectName || args.projectId) {
+        locationText = args.projectName
+          ? `in project "${args.projectName}"`
+          : `in project ID ${args.projectId}`;
       } else {
         locationText = "in your inbox";
       }

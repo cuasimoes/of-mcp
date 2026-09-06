@@ -280,6 +280,21 @@ async function main() {
     check('(#7) task2 got B>Dup via path in batch_add_items', (snap.items[t2.id] || []).some(t => t.id === fixture.bDupId), tagsOf(snap, t2.id));
     check('(#7) batch_add_items created no garbage tag', snap.ourTags.length === EXPECTED_TAGS, snap.ourTags.join(', '));
 
+    // Two items in ONE batch call referencing the same brand-new name must share one tag.
+    // The creation cache is per resolveTagRefs() call, so this only holds if flattenedTags
+    // is live within the script run rather than snapshotted.
+    console.log(`\n7a. batch_add_items: two items both tagged "${PREFIX}Shared" (new name)`);
+    const sharedName = `${PREFIX}Shared`;
+    const baShared = await batchAddItems([
+      { type: 'task', name: `${PREFIX}shared1`, projectId: proj.projectId, tags: [sharedName] },
+      { type: 'task', name: `${PREFIX}shared2`, projectId: proj.projectId, tags: [sharedName] }
+    ]);
+    baShared.results.forEach(r => { if (r.success) created.taskIds.push(r.id); });
+    snap = await inspect({ taskIds: baShared.results.filter(r => r.success).map(r => r.id) });
+    const sharedCount = snap.ourTags.filter(n => n === sharedName).length;
+    const sharedTagIds = new Set(baShared.results.filter(r => r.success).flatMap(r => (snap.items[r.id] || []).filter(t => t.name === sharedName).map(t => t.id)));
+    check('batch: same new tag name across two items creates exactly ONE tag', sharedCount === 1 && sharedTagIds.size === 1, `tagsNamed=${sharedCount} distinctIds=${sharedTagIds.size}`);
+
     console.log(`\n7b. batch_add_items project with tags: ["zzzzzzzzz_9"] (ID-shaped, does not exist)`);
     const baBad = await batchAddItems([{ type: 'project', name: `${PREFIX}badproj`, tags: ['zzzzzzzzz_9'] }]);
     const badRes = baBad.results[0] || {};

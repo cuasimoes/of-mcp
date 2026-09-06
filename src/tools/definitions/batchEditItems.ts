@@ -24,7 +24,7 @@ const editItemSchema = z.object({
 
   // Tag operations (work on both tasks and projects)
   addTags: z.array(z.string()).optional().describe("Tags to add (works on both tasks and projects). Each entry may be a tag ID, a 'Parent > Child' path, or a plain name. Names match active tags only (never dropped ones) and are created if missing; an ID or path that does not resolve fails this edit."),
-  removeTags: z.array(z.string()).optional().describe("Tags to remove (works on both tasks and projects). Accepts tag IDs, 'Parent > Child' paths, or plain names (active tags only)."),
+  removeTags: z.array(z.string()).optional().describe("Tags to remove (works on both tasks and projects). Resolved against the item's OWN tags — tag ID, 'Parent > Child' path, or plain name, any status, so a dropped tag can be removed by name. A reference that is not on the item is reported as a warning and removes nothing."),
   replaceTags: z.array(z.string()).optional().describe("Replace all existing tags (works on both tasks and projects). Same reference rules as addTags: tag ID, 'Parent > Child' path, or plain name."),
 
   // Task-specific fields
@@ -40,7 +40,7 @@ const editItemSchema = z.object({
   moveToInbox: z.boolean().optional().describe("Set to true to move task to inbox"),
 
   // Project-specific fields
-  newSequential: z.boolean().optional().describe("Whether the project should be sequential"),
+  newSequential: z.boolean().optional().describe("Whether the project or action group should be sequential"),
   newFolderName: z.string().optional().describe("Move project to a different folder (by name)"),
   newFolderId: z.string().optional().describe("Move project to a different folder (by ID)"),
   newProjectStatus: z.enum(['active', 'completed', 'dropped', 'onHold']).optional().describe("New status for projects"),

@@ -20,7 +20,8 @@
         status: tag.status === Tag.Status.Active ? 'active'
               : tag.status === Tag.Status.OnHold ? 'onHold'
               : 'dropped',
-        parent: tag.parent ? tag.parent.name : null
+        parent: tag.parent ? tag.parent.name : null,
+        parentId: tag.parent ? tag.parent.id.primaryKey : null
       };
 
       // Only fetch task counts if requested (expensive operation)
