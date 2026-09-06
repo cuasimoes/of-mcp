@@ -241,11 +241,19 @@
             tempIdMap.set(item.tempId, newTask);
           }
 
+          // Report the container that was actually resolved so callers don't re-derive it from inputs
+          const containerInfo = { type: containerType };
+          if (container) {
+            containerInfo.id = container.id.primaryKey;
+            containerInfo.name = container.name;
+          }
+
           const taskResult = {
             success: true,
             type: 'task',
             id: newTask.id.primaryKey,
-            name: newTask.name
+            name: newTask.name,
+            container: containerInfo
           };
           if (item.tempId) {
             taskResult.tempId = item.tempId;
