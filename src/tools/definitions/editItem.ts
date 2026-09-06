@@ -39,7 +39,7 @@ export const schema = z.object({
   moveToInbox: z.boolean().optional().describe("Set to true to move task to inbox"),
 
   // Project-specific fields
-  newSequential: z.boolean().optional().describe("Whether the project should be sequential"),
+  newSequential: z.boolean().optional().describe("Whether the project or action group should be sequential"),
   newFolderName: z.string().optional().describe("New folder to move the project to (by folder name)"),
   newFolderId: z.string().optional().describe("New folder to move the project to (by folder ID)"),
   newProjectStatus: z.enum(['active', 'completed', 'dropped', 'onHold']).optional().describe("New status for projects"),
