@@ -354,6 +354,10 @@ Access your OmniFocus custom perspectives with hierarchical task display:
 # List all your custom perspectives
 list_custom_perspectives {"format": "detailed"}
 
+# Inspect each perspective's filter rules and top-level aggregation
+# (a perspective whose rules cannot be read is reported as such, never as a default)
+list_custom_perspectives {"format": "rules"}
+
 # Get tasks from custom perspective by name
 get_custom_perspective_tasks {
   "perspectiveName": "Today's Work",  # Your custom perspective name
@@ -588,7 +592,7 @@ get_project_by_id {
 17. **batch_filter_tasks** - Filter multiple projects in one call (faster than multiple filter_tasks)
 
 ### 🌟 Custom Perspective Tools
-18. **list_custom_perspectives** - List all custom perspectives with details
+18. **list_custom_perspectives** - List all custom perspectives with details (`format: "rules"` shows each perspective's filter rules)
 19. **get_custom_perspective_tasks** - Access custom perspective with hierarchical display
 
 ### 📊 Analytics & Tracking
